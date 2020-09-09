@@ -1,0 +1,8 @@
+README.md
+setup.py
+lumpyrem/__init__.py
+lumpyrem/lumpyrem.py
+lumpyrem_RHugman.egg-info/PKG-INFO
+lumpyrem_RHugman.egg-info/SOURCES.txt
+lumpyrem_RHugman.egg-info/dependency_links.txt
+lumpyrem_RHugman.egg-info/top_level.txt
