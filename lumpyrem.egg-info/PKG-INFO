@@ -1,5 +1,5 @@
 Metadata-Version: 2.1
-Name: lumpyrem-RHugman
+Name: lumpyrem
 Version: 0.0.1
 Summary: This package reads, writes and runs LUMPREM2
 Home-page: https://github.com/pypa/sampleproject

@@ -1,22 +1,3 @@
-# runs a process 
-def run_process(process, path, commands=[], print_output=True):
-        """This calls a process and then executes a list of commands
-        process - str name of process. Process needs to be added to environmental path
-        path - directory where input and output files are stored
-        commands - list of strings with input commands in sequence. """
-
-        import os
-        owd = os.getcwd()
-        os.chdir(path)
-
-        import subprocess
-        p = subprocess.run([process], stdout=subprocess.PIPE,
-                input='\n'.join(map(str, commands))+'\n', encoding='ascii')
-
-        if print_output==True:
-                print(p.stdout)
-        os.chdir(owd)
-
 def set_uniquekeys(dictionary):
     unique_keys = {'start_date':'01/01/2000',
                 'end_date':'31/12/2010',
@@ -25,6 +6,8 @@ def set_uniquekeys(dictionary):
                 }
     unique_keys.update(dictionary)
     return unique_keys
+
+
 
 def write_lumprep(infile, unique_keys, datasets):
     #write the unique keys to input file
@@ -56,18 +39,6 @@ def write_lumprep(infile, unique_keys, datasets):
     f.close()
 
 
-def get_col_dict(lrout):
-    with open(lrout, 'r') as file:
-        a = file.readline().split()
-    file.close()
-    coldict = dict.fromkeys(a,None)
-    return coldict
-
-def read_cols(lrm,tuple_list):
-    dictionary={}
-    dictionary[lrm] = tuple_list
-    return dictionary
-
 def write_ts_dict(ts_name ,scale=1.0, offset=0.0, method='linearend'):
     tsdict={}
     tsdict = {ts_name: {'scale':scale,'offset':offset,'method':method}}
@@ -85,10 +56,7 @@ def write_cols(listoftuples):
         print(text)
     return text, count
 
-def get_modellist(datasets):
-    modellist = []
-    for dset in datasets:
-        modellist.append('lr_'+dset['lumprem_model_name'])
+
 
 def write_lr2series(filein,ts_dict, col_dict, modellist):
     #write the unique keys to input file
@@ -109,3 +77,43 @@ def write_lr2series(filein,ts_dict, col_dict, modellist):
                 f.write("  {0: <15}{1: <10}{2: <10}{3:}\n".format(tsname,ts_dict[ts][tsname]['scale'],'\t'+str(ts_dict[ts][tsname]['offset']),str(ts_dict[ts][tsname]['method'])))
             f.write('\n')
     f.close()
+
+
+
+    # runs a process 
+def run_process(process, path, commands=[], print_output=True):
+        """This calls a process and then executes a list of commands
+        process - str name of process. Process needs to be added to environmental path
+        path - directory where input and output files are stored
+        commands - list of strings with input commands in sequence. """
+
+        import os
+        owd = os.getcwd()
+        os.chdir(path)
+
+        import subprocess
+        p = subprocess.run([process], stdout=subprocess.PIPE,
+                input='\n'.join(map(str, commands))+'\n', encoding='ascii')
+
+        if print_output==True:
+                print(p.stdout)
+        os.chdir(owd)
+
+
+
+def get_col_dict(lrout):
+    with open(lrout, 'r') as file:
+        a = file.readline().split()
+    file.close()
+    coldict = dict.fromkeys(a,None)
+    return coldict
+
+def read_cols(lrm,tuple_list):
+    dictionary={}
+    dictionary[lrm] = tuple_list
+    return dictionary
+
+def get_modellist(datasets):
+    modellist = []
+    for dset in datasets:
+        modellist.append('lr_'+dset['lumprem_model_name'])
