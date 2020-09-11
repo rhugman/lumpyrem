@@ -117,3 +117,11 @@ def get_modellist(datasets):
     modellist = []
     for dset in datasets:
         modellist.append('lr_'+dset['lumprem_model_name'])
+
+def read_ouput(model,filename, dropna=True):
+    import pandas as pd
+    filename = os.path.join(testpath,model+'.out')
+    df = pd.read_csv(fileName, delim_whitespace=True)
+    df.dropna(inplace=True)
+    df = df.apply(pd.to_numeric)
+    return df

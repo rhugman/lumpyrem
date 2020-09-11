@@ -11,7 +11,7 @@ def set_uniquekeys(dictionary):
 
 def write_lumprep(infile, unique_keys, datasets):
     #write the unique keys to input file
-    with open(infile, 'w') as f:
+    with open(infile, 'w+') as f:
         f.write('# File created using lumpy. \n\n')
         for key in unique_keys.keys():
             f.write("{0: <32}{1:}".format(key.upper(), str(unique_keys[key])+'\n'))
@@ -117,3 +117,10 @@ def get_modellist(datasets):
     modellist = []
     for dset in datasets:
         modellist.append('lr_'+dset['lumprem_model_name'])
+
+def read_ouput(model,filename, dropna=True):
+    import pandas as pd
+    df = pd.read_csv(filename, delim_whitespace=True)
+    df.dropna(inplace=True)
+    df = df.apply(pd.to_numeric)
+    return df
