@@ -3,6 +3,7 @@ setup.py
 lumpyrem/__init__.py
 lumpyrem/get.py
 lumpyrem/lumpyrem.py
+lumpyrem/post.py
 lumpyrem/run.py
 lumpyrem/write.py
 lumpyrem.egg-info/PKG-INFO
