@@ -1,5 +1,5 @@
 # imports
-from . import lumpyrem
+from . import lumprem
 from . import run
 from . import write
 from . import post
