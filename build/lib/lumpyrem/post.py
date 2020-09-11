@@ -12,7 +12,7 @@ def read_tsfile(file):
     #read names and methods
     start = 0
     textlist = []
-    with open(file) as f:
+    with open(filename) as f:
         for line in f:
             if 'END ATTRIBUTES' in line.upper():
                 start = 0
@@ -28,7 +28,7 @@ def read_tsfile(file):
 
     start = 0
     textlist = []
-    with open(file) as f:
+    with open(filename) as f:
         for line in f:
             if 'END TIMESERIES' in line.upper():
                 start = 0
