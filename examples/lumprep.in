@@ -1,0 +1,297 @@
+# File created using lumpyrem. 
+
+START_DATE                      01/01/2000
+END_DATE                        31/12/2010
+NDAY_OUT                        monthly
+STEPS_PER_DAY                   5
+
+# Lumprem dataset number 1
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.5260714240168055	
+LUMPREM_MODEL_NAME              m0	
+
+# Lumprem dataset number 2
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.7100676170011904	
+LUMPREM_MODEL_NAME              m1	
+
+# Lumprem dataset number 3
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.22261849468492279	
+LUMPREM_MODEL_NAME              m2	
+
+# Lumprem dataset number 4
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.026062045103001807	
+LUMPREM_MODEL_NAME              m3	
+
+# Lumprem dataset number 5
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.5533331796899008	
+LUMPREM_MODEL_NAME              m4	
+
+# Lumprem dataset number 6
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.5256523491923919	
+LUMPREM_MODEL_NAME              m5	
+
+# Lumprem dataset number 7
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.20394543721789493	
+LUMPREM_MODEL_NAME              m6	
+
+# Lumprem dataset number 8
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.47404103738368286	
+LUMPREM_MODEL_NAME              m7	
+
+# Lumprem dataset number 9
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.619570416582074	
+LUMPREM_MODEL_NAME              m8	
+
+# Lumprem dataset number 10
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.24323643318818755	
+LUMPREM_MODEL_NAME              m9	
+
+# Lumprem dataset number 11
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.3836166305865676	
+LUMPREM_MODEL_NAME              m10	
+
+# Lumprem dataset number 12
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.7724620802823252	
+LUMPREM_MODEL_NAME              m11	
+
+# Lumprem dataset number 13
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.06653570278187115	
+LUMPREM_MODEL_NAME              m12	
+
+# Lumprem dataset number 14
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.16297569968895753	
+LUMPREM_MODEL_NAME              m13	
+
+# Lumprem dataset number 15
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.306573082627167	
+LUMPREM_MODEL_NAME              m14	
+
+# Lumprem dataset number 16
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.4857845321214199	
+LUMPREM_MODEL_NAME              m15	
+
+# Lumprem dataset number 17
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.8799812051745142	
+LUMPREM_MODEL_NAME              m16	
+
+# Lumprem dataset number 18
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.9750415267321282	
+LUMPREM_MODEL_NAME              m17	
+
+# Lumprem dataset number 19
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.18633547744921564	
+LUMPREM_MODEL_NAME              m18	
+
+# Lumprem dataset number 20
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.40123681935939726	
+LUMPREM_MODEL_NAME              m19	
+
+# Lumprem dataset number 21
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.7237764864896727	
+LUMPREM_MODEL_NAME              m20	
+
+# Lumprem dataset number 22
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.7552629855333604	
+LUMPREM_MODEL_NAME              m21	
+
+# Lumprem dataset number 23
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.6807961786071299	
+LUMPREM_MODEL_NAME              m22	
+
+# Lumprem dataset number 24
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.08759970428569475	
+LUMPREM_MODEL_NAME              m23	
+
+# Lumprem dataset number 25
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.052385504474452005	
+LUMPREM_MODEL_NAME              m24	
+
+# Lumprem dataset number 26
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.4873337992339998	
+LUMPREM_MODEL_NAME              m25	
+
+# Lumprem dataset number 27
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.681542672378301	
+LUMPREM_MODEL_NAME              m26	
+
+# Lumprem dataset number 28
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.36446274186408134	
+LUMPREM_MODEL_NAME              m27	
+
+# Lumprem dataset number 29
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.05980078765307539	
+LUMPREM_MODEL_NAME              m28	
+

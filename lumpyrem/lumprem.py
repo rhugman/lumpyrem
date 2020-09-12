@@ -81,13 +81,15 @@ def write_lr2series(filein,ts_dict, col_dict, modellist):
 
 
     # runs a process 
-def run_process(process, path, commands=[], print_output=True):
+def run_process(process, path=False, commands=[], print_output=True):
         """This calls a process and then executes a list of commands
         process - str name of process. Process needs to be added to environmental path
         path - directory where input and output files are stored
         commands - list of strings with input commands in sequence. """
-
         import os
+        if path == False:
+            path = os.getcwd()
+        
         owd = os.getcwd()
         os.chdir(path)
 
@@ -135,11 +137,15 @@ class Simulation:
         self.nday_out = 'monthly'
         self.steps_per_day = 5
         self.model_list = model_list
+        self.model_names = []
+        for m in model_list:
+            self.model_names.append(m.lumprem_model_name)
 
-    def write_simulation(self, infile):
-            #write the unique keys to input file
+    def write_simulation(self, infile='lumprep.in', lumprep=True):
+            #write the unique keys to lumprep input file
             unique_keys = self.__dict__.copy()
             unique_keys.pop('model_list', None)
+            unique_keys.pop('model_names', None)
 
             with open(infile, 'w') as f:
                 f.write('# File created using lumpyrem. \n\n')
@@ -148,7 +154,7 @@ class Simulation:
                 f.write('\n')
             f.close()
 
-            #write datasets to input file
+            #write models to lumprep input file
             count=0
             for model in self.model_list:
                 model_dict = model.__dict__
@@ -168,18 +174,62 @@ class Simulation:
                     f.write('\n')
             f.close()
 
-    def test(self,model):
-                print(model.silofile)
+            if lumprep == True:
+                import os
+                cwd = os.getcwd()
+                run_process('lumprep', commands=[infile])
+            else:
+                return
+
+
+    def run_simulation(self):
+        for model in self.model_list:
+            model_name = model.lumprem_model_name
+
+            run_process('lumprem', commands=['lr_'+model_name+'.in','lr_'+model_name+'.out'])
+
+    def get_results(self):
+        import pandas as pd
+        results = pd.DataFrame()
+        for m in self.model_names:
+            abc = []
+            filename = 'lr_'+str(m)+'.out'
+            textlist = []
+
+            with open(filename) as f:
+                for line in f:
+                    textlist.append([i for i in line.split()])
+
+            floatlist=[]
+            for i in textlist[1:-2]:
+                floatlist.append([float(x) for x in i])
+            df = pd.DataFrame(floatlist, columns=textlist[0])
+            df['model_name'] = str(m)
+            results = pd.concat([results,df])
+
+        param2 = pd.DataFrame()
+        for model in self.model_list:
+            columns = model.__dict__.keys()
+            param = pd.DataFrame(columns=columns)
+            for k in columns:
+                param.at[0,k] = model.__dict__[k]
+                param[k] = pd.to_numeric(param[k],errors='ignore')
+            param2 = pd.concat([param2,param])
+
+        final = results.merge(param2,how='outer', left_on='model_name', right_on='lumprem_model_name')
+)
+        return final
+
 
 class Model():
     def __init__(self, model_name, silofile):
         self.silofile = (silofile,'evap')
         self.rainfile = 'rain.dat'
         self.epotfile = 'epot.dat'
-        self.vegfile = (0.2,1.5)
-        self.irrigfile = (0.0)
+        self.vegfile = (0.2, 1.5)
+        self.irrigfile = (1, 1.0)
         self.maxvol = 0.5
-        self.irrigvolfrac = 0.0
+        self.irrigvolfrac = 0.5
         self.rdelay = None
         self.mdelay = None
         self.ks = None
@@ -191,6 +241,6 @@ class Model():
         self.factor2 = None
         self.power = None
         self.vol = None
-        self.model_name = model_name
+        self.lumprem_model_name = model_name
         self.batch_file = None
         self.pest_control_file = None
