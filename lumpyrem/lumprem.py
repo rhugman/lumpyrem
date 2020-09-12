@@ -124,3 +124,73 @@ def read_ouput(model,filename, dropna=True):
     df.dropna(inplace=True)
     df = df.apply(pd.to_numeric)
     return df
+
+
+
+
+class Simulation:
+    def __init__(self, model_list):
+        self.start_date = '01/01/2000'
+        self.end_date = '31/12/2010'
+        self.nday_out = 'monthly'
+        self.steps_per_day = 5
+        self.model_list = model_list
+
+    def write_simulation(self, infile):
+            #write the unique keys to input file
+            unique_keys = self.__dict__.copy()
+            unique_keys.pop('model_list', None)
+
+            with open(infile, 'w') as f:
+                f.write('# File created using lumpyrem. \n\n')
+                for key in unique_keys.keys():
+                    f.write("{0: <32}{1:}".format(key.upper(), str(unique_keys[key])+'\n'))
+                f.write('\n')
+            f.close()
+
+            #write datasets to input file
+            count=0
+            for model in self.model_list:
+                model_dict = model.__dict__
+                count = count+1
+                with open(infile, 'a') as f:
+                    f.write('# Lumprem dataset number '+str(count)+'\n')
+                    for key in model_dict:
+                        if type(model_dict[key]) == tuple:
+                            input1 = model_dict[key][0]
+                            input2 = model_dict[key][1]
+                        else:
+                            input1 = model_dict[key]
+                            input2 = ''
+                            if input1 == None:
+                                continue
+                        f.write("{0: <32}{1:}{2:}".format(key.upper(), str(input1),'\t'+str(input2)+'\n'))
+                    f.write('\n')
+            f.close()
+
+    def test(self,model):
+                print(model.silofile)
+
+class Model():
+    def __init__(self, model_name, silofile):
+        self.silofile = (silofile,'evap')
+        self.rainfile = 'rain.dat'
+        self.epotfile = 'epot.dat'
+        self.vegfile = (0.2,1.5)
+        self.irrigfile = (0.0)
+        self.maxvol = 0.5
+        self.irrigvolfrac = 0.0
+        self.rdelay = None
+        self.mdelay = None
+        self.ks = None
+        self.M = None
+        self.L = None
+        self.mflowmax = None
+        self.offset = None
+        self.factor1 = None
+        self.factor2 = None
+        self.power = None
+        self.vol = None
+        self.model_name = model_name
+        self.batch_file = None
+        self.pest_control_file = None

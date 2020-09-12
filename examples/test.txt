@@ -1,0 +1,37 @@
+# File created using lumpyrem. 
+
+START_DATE                      01/01/2000
+END_DATE                        31/12/2010
+NDAY_OUT                        monthly
+STEPS_PER_DAY                   5
+
+# Lumprem dataset number 1
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       0.0	
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.0	
+MODEL_NAME                      model1	
+
+# Lumprem dataset number 2
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       0.0	
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.0	
+MODEL_NAME                      model2	
+
+# Lumprem dataset number 3
+SILOFILE                        silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       0.0	
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.0	
+MODEL_NAME                      model3	
+

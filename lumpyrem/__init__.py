@@ -3,6 +3,7 @@ from . import lumprem
 from . import run
 from . import write
 from . import post
+from . import get
 
 from os.path import dirname, basename, isfile
 import glob
