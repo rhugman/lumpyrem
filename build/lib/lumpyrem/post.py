@@ -1,4 +1,4 @@
-def read_tsfile(file): 
+def read_tsfile(filename): 
     """Reads a MODFLOW6 timeseries file and return timeries as rec array.
 
     INPUT
