@@ -47,7 +47,7 @@ class TimeSeries():
                     f.write("\t{0}\t\t{1}\t\t{2}".format(self.ts_names[col]+'_'+model_name, self.lumprem_ouput_cols[col],self.div_delta[col]+'\n'))
                 f.write('\n\n')
 
-            f.write('# Begin writting MF6 time series\n\n')
+            f.write('WRITE_MF6_TIME_SERIES_FILE '+self.ts_file+' '+str(count*len(self.lr_models))+'\n')
             f.write("#\t{0}\t\t{1}\t\t{2}\t\t{3}".format('ts_name','scale','offset','mf6method\n\n'))
             for model in self.lr_models:
                 model_name = model.lumprem_model_name
@@ -56,8 +56,8 @@ class TimeSeries():
 
         f.close()
         print('MF6 timeseries file '+ts_file+' written to:\n'+ts_file)
-
-    def run(self):
-            filename = self.ts_file
-            path = self.workspace
-            lumprem.run_process('lr2series', commands=[filename+'.in'],path=path)
+        
+        #write ts file
+        filename = self.ts_file
+        path = self.workspace
+        lumprem.run_process('lr2series', commands=[filename+'.in'],path=path)
