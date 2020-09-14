@@ -1,10 +1,9 @@
-ptf $
 * earth properties
-$maxvol_lm3  $  $irigvf_lm3  $
-$rdelay_lm3  $  $mdelay_lm3  $
-$ks_lm3      $  $m_lm3       $  $l_lm3       $  $mfmax_lm3   $
+  0.5000000      0.1132217    
+   5.000000       1.000000    
+  0.1000000      0.5000000      0.5000000      0.1000000    
 * volume to elevation
-$offset_lm3  $  $fac1_lm3    $  $fac2_lm3    $  $power_lm3   $
+   0.000000       1.000000       1.000000       0.000000    
 * topographic surface
    100.000000    
 * initial conditions
@@ -26,7 +25,7 @@ $offset_lm3  $  $fac1_lm3    $  $fac2_lm3    $  $power_lm3   $
  3074 3104 3135 3166 3196 3227 3257 3288 3319 3347 3378 3408 3439 3469 3500 3531 3561 3592 3622 3653
  3684 3712 3743 3773 3804 3834 3865 3896 3926 3957 3987 4018
 * data filenames
-$crfac_lm3   $  $gamma_lm3   $
+  0.2000000       1.500000    
 rain.dat
 epot.dat
-    1  $gwirfr_lm3   $
+  1    1.000000    

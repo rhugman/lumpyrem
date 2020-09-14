@@ -4,6 +4,7 @@ from . import run
 from . import write
 from . import post
 from . import get
+from . import lr2series
 
 from os.path import dirname, basename, isfile
 import glob
