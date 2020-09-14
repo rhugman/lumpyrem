@@ -20,6 +20,6 @@ To install Lupyrem type:
 # Documentaion
 Documentation is a work in progress. A Jupyter Notebook is provided with simple examples of code functionality. 
 
-LUMPREM and utilities are accopanied by extensive documentation. 
+LUMPREM and utilities are extensively documented.
 
 
