@@ -1,5 +1,6 @@
 import os
-from lumpyrem import lumprem
+from lumpyrem import run
+
 class TimeSeries():
     def __init__(self,ts_file, lr_models, ts_names,
                       lumprem_ouput_cols, 
@@ -60,4 +61,4 @@ class TimeSeries():
         #write ts file
         filename = self.ts_file
         path = self.workspace
-        lumprem.run_process('lr2series', commands=[filename+'.in'],path=path)
+        run.run_process('lr2series', commands=[filename+'.in'],path=path)
