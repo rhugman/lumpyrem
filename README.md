@@ -7,6 +7,8 @@ It is intended to make setting up and running LUMPREM models easier, in particul
 
 Lumpyrem is very much a work in progress. User beware.
 
+LUMPREM requires daily inputs of rainfall and potential ET. Nonlinear relationships based on stored soil moisture are used to calculate recharge, runoff and actual ET. The parameters which govern these relationships can be adjusted by PEST. Numerous quantities of interest are recorded on LUMPREM’s output file. These include residual daily ET (which can be reformatted for input to the EVT package of MODFLOW), irrigation demand, and boundary condition head. The latter is calculated using a parameterizable, nonlinear relationship between head and stored soil moisture. Heads calculated in this way can be assigned to MODFLOW boundary conditions after appropriate re-formatting.
+
 # Installation
 Lumpyrem requires LUMPREM, LUMPREP and LR2SERIES. Executables can be downloaded from the [PESTHomepage.org](https://pesthomepage.org/software-0). It is recomended these be placed in a folder in the environment path on your local machine. Alternatively, the executables may be placed within the workspace folder.
 
@@ -18,6 +20,6 @@ To install Lupyrem type:
 # Documentaion
 Documentation is a work in progress. A Jupyter Notebook is provided with simple examples of code functionality. 
 
-LUMPREM and utilities are accopanied by extensive documentation.
+LUMPREM and utilities are accopanied by extensive documentation. 
 
 
