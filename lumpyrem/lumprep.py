@@ -41,7 +41,6 @@ class Simulation():
         self.pest_control_file = pest_control_file
         self.silofile = silofile
 
-
     def write_simulation(self, infile='lumprep.in'):
         """Writes the LUMPREP input file from the Simulation object.
         Parameters
@@ -65,7 +64,7 @@ class Simulation():
         for model in self.model_list:
             model_dict = model.__dict__
             count = count+1
-    
+
             with open(infile, 'a') as f:
                 f.write('# Lumprem dataset number '+str(count)+'\n')
                 f.write("{0: <32} {1:}{2:}".format('SILOFILE', self.silofile[0],'\t'+str(self.silofile[1])+'\n'))
