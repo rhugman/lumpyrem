@@ -4,14 +4,6 @@ lumpyrem package
 Submodules
 ----------
 
-lumpyrem.get module
--------------------
-
-.. automodule:: lumpyrem.get
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 lumpyrem.lr2series module
 -------------------------
 
@@ -36,13 +28,6 @@ lumpyrem.lumprep module
    :undoc-members:
    :show-inheritance:
 
-lumpyrem.post module
---------------------
-
-.. automodule:: lumpyrem.post
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 lumpyrem.run module
 -------------------
@@ -52,13 +37,6 @@ lumpyrem.run module
    :undoc-members:
    :show-inheritance:
 
-lumpyrem.write module
----------------------
-
-.. automodule:: lumpyrem.write
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 Module contents
 ---------------

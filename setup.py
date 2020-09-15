@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="lumpyrem", 
-    version="0.0.5",
+    version="0.0.6",
     author="Rui Hugman",
     author_email="rthugman@gmail.com",
     description="This package reads, writes and runs LUMPREM2 and associated utility programs",

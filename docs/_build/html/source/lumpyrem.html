@@ -35,7 +35,8 @@
 
     
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" /> 
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="Welcome to lumpyrem&#39;s documentation!" href="../index.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -80,22 +81,18 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"><ul>
-<li><a class="reference internal" href="#">lumpyrem package</a><ul>
-<li><a class="reference internal" href="#submodules">Submodules</a></li>
-<li><a class="reference internal" href="#module-lumpyrem.get">lumpyrem.get module</a></li>
-<li><a class="reference internal" href="#module-lumpyrem.lr2series">lumpyrem.lr2series module</a></li>
-<li><a class="reference internal" href="#module-lumpyrem.lumprem">lumpyrem.lumprem module</a></li>
-<li><a class="reference internal" href="#module-lumpyrem.lumprep">lumpyrem.lumprep module</a></li>
-<li><a class="reference internal" href="#module-lumpyrem.post">lumpyrem.post module</a></li>
-<li><a class="reference internal" href="#module-lumpyrem.run">lumpyrem.run module</a></li>
-<li><a class="reference internal" href="#module-lumpyrem.write">lumpyrem.write module</a></li>
-<li><a class="reference internal" href="#module-lumpyrem">Module contents</a></li>
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">lumpyrem package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-lumpyrem.lr2series">lumpyrem.lr2series module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-lumpyrem.lumprem">lumpyrem.lumprem module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-lumpyrem.lumprep">lumpyrem.lumprep module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-lumpyrem.run">lumpyrem.run module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-lumpyrem">Module contents</a></li>
 </ul>
 </li>
 </ul>
-</div>
+
             
           
         </div>
@@ -164,34 +161,84 @@
 <div class="section" id="submodules">
 <h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
 </div>
-<div class="section" id="module-lumpyrem.get">
-<span id="lumpyrem-get-module"></span><h2>lumpyrem.get module<a class="headerlink" href="#module-lumpyrem.get" title="Permalink to this headline">¶</a></h2>
-<dl class="py function">
-<dt id="lumpyrem.get.get_col_dict">
-<code class="sig-prename descclassname">lumpyrem.get.</code><code class="sig-name descname">get_col_dict</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">lrout</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.get.get_col_dict" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py function">
-<dt id="lumpyrem.get.get_modellist">
-<code class="sig-prename descclassname">lumpyrem.get.</code><code class="sig-name descname">get_modellist</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">datasets</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.get.get_modellist" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py function">
-<dt id="lumpyrem.get.read_cols">
-<code class="sig-prename descclassname">lumpyrem.get.</code><code class="sig-name descname">read_cols</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">lrm</span></em>, <em class="sig-param"><span class="n">tuple_list</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.get.read_cols" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</div>
 <div class="section" id="module-lumpyrem.lr2series">
 <span id="lumpyrem-lr2series-module"></span><h2>lumpyrem.lr2series module<a class="headerlink" href="#module-lumpyrem.lr2series" title="Permalink to this headline">¶</a></h2>
 <dl class="py class">
 <dt id="lumpyrem.lr2series.TimeSeries">
 <em class="property">class </em><code class="sig-prename descclassname">lumpyrem.lr2series.</code><code class="sig-name descname">TimeSeries</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">ts_file</span></em>, <em class="sig-param"><span class="n">lr_models</span></em>, <em class="sig-param"><span class="n">ts_names</span></em>, <em class="sig-param"><span class="n">lumprem_ouput_cols</span></em>, <em class="sig-param"><span class="n">div_delta_t</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">workspace</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class used to link a MODFLOW6 timeseries file to LUMPREM model outputs.</p>
+<dl class="py attribute">
+<dt id="lumpyrem.lr2series.TimeSeries.ts_file">
+<code class="sig-name descname">ts_file</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.ts_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>filename and path of MODFLOW6 timeseries file to write.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lr2series.TimeSeries.lr_models">
+<code class="sig-name descname">lr_models</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.lr_models" title="Permalink to this definition">¶</a></dt>
+<dd><p>list of lumpyrem Model objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lr2series.TimeSeries.ts_names">
+<code class="sig-name descname">ts_names</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.ts_names" title="Permalink to this definition">¶</a></dt>
+<dd><p>list of names for timeseries to include in the MODFLOW6 timeseries file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>list of str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lr2series.TimeSeries.lumprem_ouput_cols">
+<code class="sig-name descname">lumprem_ouput_cols</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.lumprem_ouput_cols" title="Permalink to this definition">¶</a></dt>
+<dd><p>list of LUMPREM output columns to import as timeseries. This list must match ts_names length and order.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>list of str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lr2series.TimeSeries.div_delta_t">
+<code class="sig-name descname">div_delta_t</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.div_delta_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>True (Default) if LR2SERIES div_delta_t. False if LR2SERIES no_div_delta_t .</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lr2series.TimeSeries.workspace">
+<code class="sig-name descname">workspace</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.workspace" title="Permalink to this definition">¶</a></dt>
+<dd><p>Path to workspace folder. Default is current working directory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>path</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py method">
 <dt id="lumpyrem.lr2series.TimeSeries.write_ts">
 <code class="sig-name descname">write_ts</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.write_ts" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Writes the MODFLOW6 timeseries file.</p>
+</dd></dl>
 
 </dd></dl>
 
@@ -200,29 +247,282 @@
 <span id="lumpyrem-lumprem-module"></span><h2>lumpyrem.lumprem module<a class="headerlink" href="#module-lumpyrem.lumprem" title="Permalink to this headline">¶</a></h2>
 <dl class="py class">
 <dt id="lumpyrem.lumprem.Model">
-<em class="property">class </em><code class="sig-prename descclassname">lumpyrem.lumprem.</code><code class="sig-name descname">Model</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">model_name</span></em>, <em class="sig-param"><span class="n">silofile</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">workspace</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprem.Model" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">lumpyrem.lumprem.</code><code class="sig-name descname">Model</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">model_name</span></em>, <em class="sig-param"><span class="n">rainfile</span><span class="o">=</span><span class="default_value">'rain.dat'</span></em>, <em class="sig-param"><span class="n">epotfile</span><span class="o">=</span><span class="default_value">'epot.dat'</span></em>, <em class="sig-param"><span class="n">vegfile</span><span class="o">=</span><span class="default_value">'veg.in'</span></em>, <em class="sig-param"><span class="n">irrigfile</span><span class="o">=</span><span class="default_value">'irrig.in'</span></em>, <em class="sig-param"><span class="n">maxvol</span><span class="o">=</span><span class="default_value">0.5</span></em>, <em class="sig-param"><span class="n">irrigvolfrac</span><span class="o">=</span><span class="default_value">0.5</span></em>, <em class="sig-param"><span class="n">rdelay</span><span class="o">=</span><span class="default_value">5</span></em>, <em class="sig-param"><span class="n">mdelay</span><span class="o">=</span><span class="default_value">1</span></em>, <em class="sig-param"><span class="n">ks</span><span class="o">=</span><span class="default_value">0.1</span></em>, <em class="sig-param"><span class="n">M</span><span class="o">=</span><span class="default_value">0.5</span></em>, <em class="sig-param"><span class="n">L</span><span class="o">=</span><span class="default_value">0.5</span></em>, <em class="sig-param"><span class="n">mflowmax</span><span class="o">=</span><span class="default_value">0.1</span></em>, <em class="sig-param"><span class="n">offset</span><span class="o">=</span><span class="default_value">0.0</span></em>, <em class="sig-param"><span class="n">factor1</span><span class="o">=</span><span class="default_value">1.0</span></em>, <em class="sig-param"><span class="n">factor2</span><span class="o">=</span><span class="default_value">1.0</span></em>, <em class="sig-param"><span class="n">power</span><span class="o">=</span><span class="default_value">0.0</span></em>, <em class="sig-param"><span class="n">vol</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">silofile</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">workspace</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprem.Model" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class used to represent a lumprem.in file. It facilitates the generating LUMPREM models and handling outputs.
+Default values are provded for all parameters however the user is advised to update those pertinnent to their case.</p>
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.model_name">
+<code class="sig-name descname">model_name</code><a class="headerlink" href="#lumpyrem.lumprem.Model.model_name" title="Permalink to this definition">¶</a></dt>
+<dd><p>name for LUMPREM model. Must be 3 characters or less.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.rainfile">
+<code class="sig-name descname">rainfile</code><a class="headerlink" href="#lumpyrem.lumprem.Model.rainfile" title="Permalink to this definition">¶</a></dt>
+<dd><p>name of rain file (default 'ran.dat').</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str or tuple, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.epotfile">
+<code class="sig-name descname">epotfile</code><a class="headerlink" href="#lumpyrem.lumprem.Model.epotfile" title="Permalink to this definition">¶</a></dt>
+<dd><p>name of evaporation file (default 'epot.dat').</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.vegfile">
+<code class="sig-name descname">vegfile</code><a class="headerlink" href="#lumpyrem.lumprem.Model.vegfile" title="Permalink to this definition">¶</a></dt>
+<dd><p>name of vegfile file or tuple with crop factor and gamma (default 'veg.in').</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str or tuple, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.irrigfile">
+<code class="sig-name descname">irrigfile</code><a class="headerlink" href="#lumpyrem.lumprem.Model.irrigfile" title="Permalink to this definition">¶</a></dt>
+<dd><p>name of irrigation file or tuple with irrigation code and groundwater extraction fraction (default 'irrig.in').</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str or tuple, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.maxvol">
+<code class="sig-name descname">maxvol</code><a class="headerlink" href="#lumpyrem.lumprem.Model.maxvol" title="Permalink to this definition">¶</a></dt>
+<dd><p>volume of soil moisture (default 0.5)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.vol">
+<code class="sig-name descname">vol</code><a class="headerlink" href="#lumpyrem.lumprem.Model.vol" title="Permalink to this definition">¶</a></dt>
+<dd><p>volume at beggining of model run (default maxvol/2)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.irrigvolfrac">
+<code class="sig-name descname">irrigvolfrac</code><a class="headerlink" href="#lumpyrem.lumprem.Model.irrigvolfrac" title="Permalink to this definition">¶</a></dt>
+<dd><p>fraction of soil moisture irrigation must maintain, between 0.0 and 1.0. (default 0.5)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.rdelay">
+<code class="sig-name descname">rdelay</code><a class="headerlink" href="#lumpyrem.lumprem.Model.rdelay" title="Permalink to this definition">¶</a></dt>
+<dd><p>delay in days between water draining from soil moisture and being assigned to grounwater recharge (default 5)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.mdelay">
+<code class="sig-name descname">mdelay</code><a class="headerlink" href="#lumpyrem.lumprem.Model.mdelay" title="Permalink to this definition">¶</a></dt>
+<dd><p>delay in days between water draining from soil moisture and being assigned to macropore grounwater recharge (default 1)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.ks">
+<code class="sig-name descname">ks</code><a class="headerlink" href="#lumpyrem.lumprem.Model.ks" title="Permalink to this definition">¶</a></dt>
+<dd><p>saturated hydraulic conductivity (default 0.1)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float,optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.L">
+<code class="sig-name descname">L</code><a class="headerlink" href="#lumpyrem.lumprem.Model.L" title="Permalink to this definition">¶</a></dt>
+<dd><p>pore connectivity parameter (default 0.5)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.M">
+<code class="sig-name descname">M</code><a class="headerlink" href="#lumpyrem.lumprem.Model.M" title="Permalink to this definition">¶</a></dt>
+<dd><p>parameter determining the shape of drainage rate vs stored water relationship (default 0.5)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.mflowmax">
+<code class="sig-name descname">mflowmax</code><a class="headerlink" href="#lumpyrem.lumprem.Model.mflowmax" title="Permalink to this definition">¶</a></dt>
+<dd><p>maximum macropore recharegg allowed per day (default 0.1)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.offset">
+<code class="sig-name descname">offset</code><a class="headerlink" href="#lumpyrem.lumprem.Model.offset" title="Permalink to this definition">¶</a></dt>
+<dd><p>an offset, used to adjust volume to elevation (default 0.0)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt>
+<code class="sig-name descname">factor 1</code></dt>
+<dd><p>factor1 in LUMPREM, used to adjust volume to elevation (default 1.0)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt>
+<code class="sig-name descname">factor 2</code></dt>
+<dd><p>factor2 in LUMPREM, used to adjust volume to elevation (default 1.0)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.power">
+<code class="sig-name descname">power</code><a class="headerlink" href="#lumpyrem.lumprem.Model.power" title="Permalink to this definition">¶</a></dt>
+<dd><p>fapower in LUMPREM, used to adjust volume to elevation (default 1.0)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.silofile">
+<code class="sig-name descname">silofile</code><a class="headerlink" href="#lumpyrem.lumprem.Model.silofile" title="Permalink to this definition">¶</a></dt>
+<dd><p>This is to facilitate interaction with the LUMPREP simulation class (default False).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprem.Model.workspace">
+<code class="sig-name descname">workspace</code><a class="headerlink" href="#lumpyrem.lumprem.Model.workspace" title="Permalink to this definition">¶</a></dt>
+<dd><p>path to workspace folder. Default is current working directory</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>path</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py method">
 <dt id="lumpyrem.lumprem.Model.get_results">
 <code class="sig-name descname">get_results</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprem.Model.get_results" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns a Pandas dataframe of model results and parameters from the Simulation object.</p>
+<dd><p>Reads the results from the LUMPREM model and returns a Dataframe with parameters and results.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><strong>final</strong> -- Pandas dataframe of  model results and parameters.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>DataFrame</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt id="lumpyrem.lumprem.Model.run_model">
 <code class="sig-name descname">run_model</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprem.Model.run_model" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Runs the LUMPREM on model.</p>
+</dd></dl>
 
 <dl class="py method">
 <dt id="lumpyrem.lumprem.Model.write_irigfile">
-<code class="sig-name descname">write_irigfile</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">numdays</span></em>, <em class="sig-param"><span class="n">irrig_start</span></em>, <em class="sig-param"><span class="n">fracyear</span></em>, <em class="sig-param"><span class="n">irrigfile</span><span class="o">=</span><span class="default_value">'irrig.in'</span></em>, <em class="sig-param"><span class="n">irrig_end</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">date_start</span><span class="o">=</span><span class="default_value">'01/01/1900'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprem.Model.write_irigfile" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<code class="sig-name descname">write_irigfile</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">numdays</span></em>, <em class="sig-param"><span class="n">irrig_start</span></em>, <em class="sig-param"><span class="n">fracyear</span><span class="o">=</span><span class="default_value">0.3</span></em>, <em class="sig-param"><span class="n">irrigfile</span><span class="o">=</span><span class="default_value">'irrig.in'</span></em>, <em class="sig-param"><span class="n">irrig_end</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">date_start</span><span class="o">=</span><span class="default_value">'01/01/1900'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprem.Model.write_irigfile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Writes an irrigation input file to be used by LUMPREM.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>numdays</strong> (<em>int</em>) -- total number of days for the simulation</p></li>
+<li><p><strong>irrig_start</strong> (<em>str</em><em>, </em><em>int</em>) -- first date or day on which irrigation starts. Can be positive number of days or str in 'dd/mm/yyyy' format. If str, then it must be later than start_date. If date str is used then start_date must be set.</p></li>
+<li><p><strong>fracyear</strong> (<em>float</em><em>, </em><em>optional</em>) -- fraction of the year during which irrigation occurs. Must be between 0.0 and 1.0 (default 0.3)</p></li>
+<li><p><strong>irrig_end</strong> (<em>str</em><em>, </em><em>optional</em>) -- optionally the first date on which irrigation ends can be provided instead of fracyear. Must be str in forrmat 'dd/mm/yyyy'(default None). Requires start_date and irrig_start in str date format as well.</p></li>
+<li><p><strong>date_start</strong> (<em>str</em><em>, </em><em>optional</em>) -- date on which simulation starts (default '01/01/1900'). This aids in accoutning for month lengths and leap years.</p></li>
+<li><p><strong>irrigfile</strong> (<em>str</em><em>, </em><em>optional</em>) -- name of irrigation file to write (default 'irrig.in')</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt id="lumpyrem.lumprem.Model.write_model">
 <code class="sig-name descname">write_model</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">file</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">numdays</span><span class="o">=</span><span class="default_value">100</span></em>, <em class="sig-param"><span class="n">noutdays</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">nstep</span><span class="o">=</span><span class="default_value">1</span></em>, <em class="sig-param"><span class="n">mxiter</span><span class="o">=</span><span class="default_value">100</span></em>, <em class="sig-param"><span class="n">tol</span><span class="o">=</span><span class="default_value">1e-05</span></em>, <em class="sig-param"><span class="n">rbuf</span><span class="o">=</span><span class="default_value">[0.0]</span></em>, <em class="sig-param"><span class="n">mbuf</span><span class="o">=</span><span class="default_value">[0.0]</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprem.Model.write_model" title="Permalink to this definition">¶</a></dt>
-<dd><p>rbuf: the recharge delay buffer. List of volumes assumed to have left soil moisture on previous days. First lelement left soil moisture on preivous day. Second element two days previously, etc.
-mbuf: the macropore delay buffer. Same setup as rbuf.</p>
+<dd><p>Writes the LUMPREM model input files.
+Default values are provded for all parameters however the user is advised to update those pertinnent to their case.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>file</strong> (<em>str</em><em>, </em><em>optional</em>) -- file name to write (default is the model_name with the sufix '<a href="#id1"><span class="problematic" id="id2">lr_</span></a>' and file extension '.in'. For example: 'lr_abc.in')</p></li>
+<li><p><strong>numdays</strong> (<em>int</em><em>, </em><em>optional</em>) -- number of days of the model run (default 100)</p></li>
+<li><p><strong>noutdays</strong> (<em>int</em><em>, </em><em>optional</em>) -- number of days for which output is desired (default None, results in all days being recoreded)</p></li>
+<li><p><strong>nstep</strong> (<em>int</em><em>, </em><em>optonal</em>) -- number of steps into which each day is divided for iterative soil moisture computation (default 1)</p></li>
+<li><p><strong>mxiter</strong> (<em>int</em><em>, </em><em>optional</em>) -- max iterations per step 9default 100)</p></li>
+<li><p><strong>tol</strong> (<em>float</em><em>, </em><em>optional</em>) -- convergence tolerance</p></li>
+<li><p><strong>rbuf</strong> (<em>list</em><em>, </em><em>optional</em>) -- the recharge delay buffer for intial conditions. List of volumes assumed to have left soil moisture on previous days. First element left soil moisture on previous day. Second element two days previously, etc.</p></li>
+<li><p><strong>mbuf</strong> (<em>list</em><em>, </em><em>optional</em>) -- the macropore delay bufferfor intial conditions. Same setup as rbuf.</p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>
@@ -232,12 +532,109 @@ mbuf: the macropore delay buffer. Same setup as rbuf.</p>
 <span id="lumpyrem-lumprep-module"></span><h2>lumpyrem.lumprep module<a class="headerlink" href="#module-lumpyrem.lumprep" title="Permalink to this headline">¶</a></h2>
 <dl class="py class">
 <dt id="lumpyrem.lumprep.Simulation">
-<em class="property">class </em><code class="sig-prename descclassname">lumpyrem.lumprep.</code><code class="sig-name descname">Simulation</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">model_list</span></em>, <em class="sig-param"><span class="n">start_date</span><span class="o">=</span><span class="default_value">'01/01/2000'</span></em>, <em class="sig-param"><span class="n">end_date</span><span class="o">=</span><span class="default_value">'31/12/2010'</span></em>, <em class="sig-param"><span class="n">steps_per_day</span><span class="o">=</span><span class="default_value">1</span></em>, <em class="sig-param"><span class="n">nday_out</span><span class="o">=</span><span class="default_value">'monthly'</span></em>, <em class="sig-param"><span class="n">batch_file</span><span class="o">=</span><span class="default_value">'run.bat'</span></em>, <em class="sig-param"><span class="n">pest_control_file</span><span class="o">=</span><span class="default_value">'temp.pst'</span></em>, <em class="sig-param"><span class="n">silofile</span><span class="o">=</span><span class="default_value">'silofile.txt', 'evap'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprep.Simulation" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">lumpyrem.lumprep.</code><code class="sig-name descname">Simulation</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">model_list</span></em>, <em class="sig-param"><span class="n">silofile</span></em>, <em class="sig-param"><span class="n">start_date</span></em>, <em class="sig-param"><span class="n">end_date</span></em>, <em class="sig-param"><span class="n">steps_per_day</span><span class="o">=</span><span class="default_value">1</span></em>, <em class="sig-param"><span class="n">nday_out</span><span class="o">=</span><span class="default_value">'monthly'</span></em>, <em class="sig-param"><span class="n">batch_file</span><span class="o">=</span><span class="default_value">'run.bat'</span></em>, <em class="sig-param"><span class="n">pest_control_file</span><span class="o">=</span><span class="default_value">'temp.pst'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprep.Simulation" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class used to represent a lumprep.in file. It facilitates the generating coherent LUMPREM models and using a silofile as input for climate data.</p>
+<dl class="py attribute">
+<dt id="lumpyrem.lumprep.Simulation.model_list">
+<code class="sig-name descname">model_list</code><a class="headerlink" href="#lumpyrem.lumprep.Simulation.model_list" title="Permalink to this definition">¶</a></dt>
+<dd><p>list of lumprem Model objects</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprep.Simulation.silofile">
+<code class="sig-name descname">silofile</code><a class="headerlink" href="#lumpyrem.lumprep.Simulation.silofile" title="Permalink to this definition">¶</a></dt>
+<dd><p>tuple with (silo file name, column name). This is the silofile to read, and the column to be used for evapotranspiration data.For example: ('silofile.txt','evap')</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprep.Simulation.start_date">
+<code class="sig-name descname">start_date</code><a class="headerlink" href="#lumpyrem.lumprep.Simulation.start_date" title="Permalink to this definition">¶</a></dt>
+<dd><p>start date of the simulation. Must be in format dd/mm/yyyy.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprep.Simulation.end_date">
+<code class="sig-name descname">end_date</code><a class="headerlink" href="#lumpyrem.lumprep.Simulation.end_date" title="Permalink to this definition">¶</a></dt>
+<dd><p>end date of the simulation. Must be in format dd/mm/yyyy.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprep.Simulation.steps_per_day">
+<code class="sig-name descname">steps_per_day</code><a class="headerlink" href="#lumpyrem.lumprep.Simulation.steps_per_day" title="Permalink to this definition">¶</a></dt>
+<dd><p>LUMPREP variable steps_per_day and nstep control variable in LUMPREM (default 1)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprep.Simulation.nday_out">
+<code class="sig-name descname">nday_out</code><a class="headerlink" href="#lumpyrem.lumprep.Simulation.nday_out" title="Permalink to this definition">¶</a></dt>
+<dd><p>must be either a positive int or the str 'monthly'. Defines the time interval in days at which LUMPREM records results.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int, str, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprep.Simulation.batch_file">
+<code class="sig-name descname">batch_file</code><a class="headerlink" href="#lumpyrem.lumprep.Simulation.batch_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>name of the batch file to be generated.(default 'run.bat')</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lumprep.Simulation.pest_control_file">
+<code class="sig-name descname">pest_control_file</code><a class="headerlink" href="#lumpyrem.lumprep.Simulation.pest_control_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>name of the pest control file to be generated.(default 'temp.pst')</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py method">
 <dt id="lumpyrem.lumprep.Simulation.get_results">
 <code class="sig-name descname">get_results</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprep.Simulation.get_results" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns a Pandas dataframe of model results and parameters from the Simulation object.</p>
+<dd><p>Reads the results from all LUMPREM models in the Simulation object and returns a Dataframe with parameters and results.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><strong>final</strong> -- Pandas dataframe of all model results and parameters from the Simulation object.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>DataFrame</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
@@ -249,21 +646,11 @@ mbuf: the macropore delay buffer. Same setup as rbuf.</p>
 <dl class="py method">
 <dt id="lumpyrem.lumprep.Simulation.write_simulation">
 <code class="sig-name descname">write_simulation</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">infile</span><span class="o">=</span><span class="default_value">'lumprep.in'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprep.Simulation.write_simulation" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
+<dd><p>Writes the LUMPREP input file from the Simulation object.
+:param infile: filename for the LUMPREP input file (default 'lumprep.in')
+:type infile: str</p>
 </dd></dl>
 
-</div>
-<div class="section" id="module-lumpyrem.post">
-<span id="lumpyrem-post-module"></span><h2>lumpyrem.post module<a class="headerlink" href="#module-lumpyrem.post" title="Permalink to this headline">¶</a></h2>
-<dl class="py function">
-<dt id="lumpyrem.post.read_tsfile">
-<code class="sig-prename descclassname">lumpyrem.post.</code><code class="sig-name descname">read_tsfile</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">filename</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.post.read_tsfile" title="Permalink to this definition">¶</a></dt>
-<dd><p>Reads a MODFLOW6 timeseries file and return timeries as rec array.</p>
-<p>INPUT
-file: path to file.</p>
-<p>RETURNS
-a: rec array of timesteps and timeseries values</p>
 </dd></dl>
 
 </div>
@@ -272,42 +659,18 @@ a: rec array of timesteps and timeseries values</p>
 <dl class="py function">
 <dt id="lumpyrem.run.run_process">
 <code class="sig-prename descclassname">lumpyrem.run.</code><code class="sig-name descname">run_process</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">process</span></em>, <em class="sig-param"><span class="n">path</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">commands</span><span class="o">=</span><span class="default_value">[]</span></em>, <em class="sig-param"><span class="n">print_output</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.run.run_process" title="Permalink to this definition">¶</a></dt>
-<dd><p>This calls a process and then executes a list of commands
-INPUT:</p>
-<blockquote>
-<div><p>Process: String name of process to execute. Process needs to be added to environmental path or exe in same folder.
-Path: directory where input and output files are stored.
-Commands: list of strings with input commands in sequence.</p>
-</div></blockquote>
+<dd><p>This calls a process and then executes a list of commands.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>process</strong> (<em>str</em>) -- The name of the process to execute.</p></li>
+<li><p><strong>path</strong> (<em>str</em><em>, </em><em>optional</em>) -- path in which to execute commands. False (default) result sin commans being executed in current working directory.</p></li>
+<li><p><strong>commands</strong> (<em>list of str</em>) -- sequence of commands to pass to the process.</p></li>
+<li><p><strong>print_output</strong> (<em>bool</em><em>, </em><em>optional</em>) -- True, process output is printed. False, it is not.</p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
-
-</div>
-<div class="section" id="module-lumpyrem.write">
-<span id="lumpyrem-write-module"></span><h2>lumpyrem.write module<a class="headerlink" href="#module-lumpyrem.write" title="Permalink to this headline">¶</a></h2>
-<dl class="py function">
-<dt id="lumpyrem.write.set_uniquekeys">
-<code class="sig-prename descclassname">lumpyrem.write.</code><code class="sig-name descname">set_uniquekeys</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">dictionary</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.write.set_uniquekeys" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py function">
-<dt id="lumpyrem.write.write_cols">
-<code class="sig-prename descclassname">lumpyrem.write.</code><code class="sig-name descname">write_cols</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">listoftuples</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.write.write_cols" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py function">
-<dt id="lumpyrem.write.write_lr2series">
-<code class="sig-prename descclassname">lumpyrem.write.</code><code class="sig-name descname">write_lr2series</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">filein</span></em>, <em class="sig-param"><span class="n">ts_dict</span></em>, <em class="sig-param"><span class="n">col_dict</span></em>, <em class="sig-param"><span class="n">modellist</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.write.write_lr2series" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py function">
-<dt id="lumpyrem.write.write_lumprep">
-<code class="sig-prename descclassname">lumpyrem.write.</code><code class="sig-name descname">write_lumprep</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">infile</span></em>, <em class="sig-param"><span class="n">unique_keys</span></em>, <em class="sig-param"><span class="n">datasets</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.write.write_lumprep" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py function">
-<dt id="lumpyrem.write.write_ts_dict">
-<code class="sig-prename descclassname">lumpyrem.write.</code><code class="sig-name descname">write_ts_dict</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">ts_name</span></em>, <em class="sig-param"><span class="n">scale</span><span class="o">=</span><span class="default_value">1.0</span></em>, <em class="sig-param"><span class="n">offset</span><span class="o">=</span><span class="default_value">0.0</span></em>, <em class="sig-param"><span class="n">method</span><span class="o">=</span><span class="default_value">'linearend'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.write.write_ts_dict" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
 
 </div>
 <div class="section" id="module-lumpyrem">
@@ -320,6 +683,13 @@ Commands: list of strings with input commands in sequence.</p>
            
           </div>
           <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="../index.html" class="btn btn-neutral float-left" title="Welcome to lumpyrem&#39;s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
   
 
   <hr/>
