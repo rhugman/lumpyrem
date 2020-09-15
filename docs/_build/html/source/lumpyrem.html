@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>lumpyrem package &mdash; lumpyrem 0.0.5 documentation</title>
+  <title>lumprem &mdash; lumpyrem 0.0.5 documentation</title>
   
 
   
@@ -82,15 +82,10 @@
             
             
               <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">lumpyrem package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-lumpyrem.lr2series">lumpyrem.lr2series module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-lumpyrem.lumprem">lumpyrem.lumprem module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-lumpyrem.lumprep">lumpyrem.lumprep module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-lumpyrem.run">lumpyrem.run module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-lumpyrem">Module contents</a></li>
-</ul>
-</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">lumprem</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#module-lumpyrem.lumprep">lumprep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#module-lumpyrem.lr2series">lr2series</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#module-lumpyrem.run">run</a></li>
 </ul>
 
             
@@ -137,7 +132,7 @@
     
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
         
-      <li>lumpyrem package</li>
+      <li>lumprem</li>
     
     
       <li class="wy-breadcrumbs-aside">
@@ -156,95 +151,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="lumpyrem-package">
-<h1>lumpyrem package<a class="headerlink" href="#lumpyrem-package" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="submodules">
-<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
-</div>
-<div class="section" id="module-lumpyrem.lr2series">
-<span id="lumpyrem-lr2series-module"></span><h2>lumpyrem.lr2series module<a class="headerlink" href="#module-lumpyrem.lr2series" title="Permalink to this headline">¶</a></h2>
-<dl class="py class">
-<dt id="lumpyrem.lr2series.TimeSeries">
-<em class="property">class </em><code class="sig-prename descclassname">lumpyrem.lr2series.</code><code class="sig-name descname">TimeSeries</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">ts_file</span></em>, <em class="sig-param"><span class="n">lr_models</span></em>, <em class="sig-param"><span class="n">ts_names</span></em>, <em class="sig-param"><span class="n">lumprem_ouput_cols</span></em>, <em class="sig-param"><span class="n">div_delta_t</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">workspace</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<p>A class used to link a MODFLOW6 timeseries file to LUMPREM model outputs.</p>
-<dl class="py attribute">
-<dt id="lumpyrem.lr2series.TimeSeries.ts_file">
-<code class="sig-name descname">ts_file</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.ts_file" title="Permalink to this definition">¶</a></dt>
-<dd><p>filename and path of MODFLOW6 timeseries file to write.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>str</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt id="lumpyrem.lr2series.TimeSeries.lr_models">
-<code class="sig-name descname">lr_models</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.lr_models" title="Permalink to this definition">¶</a></dt>
-<dd><p>list of lumpyrem Model objects.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>list</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt id="lumpyrem.lr2series.TimeSeries.ts_names">
-<code class="sig-name descname">ts_names</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.ts_names" title="Permalink to this definition">¶</a></dt>
-<dd><p>list of names for timeseries to include in the MODFLOW6 timeseries file.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>list of str</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt id="lumpyrem.lr2series.TimeSeries.lumprem_ouput_cols">
-<code class="sig-name descname">lumprem_ouput_cols</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.lumprem_ouput_cols" title="Permalink to this definition">¶</a></dt>
-<dd><p>list of LUMPREM output columns to import as timeseries. This list must match ts_names length and order.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>list of str</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt id="lumpyrem.lr2series.TimeSeries.div_delta_t">
-<code class="sig-name descname">div_delta_t</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.div_delta_t" title="Permalink to this definition">¶</a></dt>
-<dd><p>True (Default) if LR2SERIES div_delta_t. False if LR2SERIES no_div_delta_t .</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>bool</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt id="lumpyrem.lr2series.TimeSeries.workspace">
-<code class="sig-name descname">workspace</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.workspace" title="Permalink to this definition">¶</a></dt>
-<dd><p>Path to workspace folder. Default is current working directory.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>path</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt id="lumpyrem.lr2series.TimeSeries.write_ts">
-<code class="sig-name descname">write_ts</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.write_ts" title="Permalink to this definition">¶</a></dt>
-<dd><p>Writes the MODFLOW6 timeseries file.</p>
-</dd></dl>
-
-</dd></dl>
-
-</div>
-<div class="section" id="module-lumpyrem.lumprem">
-<span id="lumpyrem-lumprem-module"></span><h2>lumpyrem.lumprem module<a class="headerlink" href="#module-lumpyrem.lumprem" title="Permalink to this headline">¶</a></h2>
+  <div class="section" id="module-lumpyrem.lumprem">
+<span id="lumprem"></span><h1>lumprem<a class="headerlink" href="#module-lumpyrem.lumprem" title="Permalink to this headline">¶</a></h1>
 <dl class="py class">
 <dt id="lumpyrem.lumprem.Model">
 <em class="property">class </em><code class="sig-prename descclassname">lumpyrem.lumprem.</code><code class="sig-name descname">Model</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">model_name</span></em>, <em class="sig-param"><span class="n">rainfile</span><span class="o">=</span><span class="default_value">'rain.dat'</span></em>, <em class="sig-param"><span class="n">epotfile</span><span class="o">=</span><span class="default_value">'epot.dat'</span></em>, <em class="sig-param"><span class="n">vegfile</span><span class="o">=</span><span class="default_value">'veg.in'</span></em>, <em class="sig-param"><span class="n">irrigfile</span><span class="o">=</span><span class="default_value">'irrig.in'</span></em>, <em class="sig-param"><span class="n">maxvol</span><span class="o">=</span><span class="default_value">0.5</span></em>, <em class="sig-param"><span class="n">irrigvolfrac</span><span class="o">=</span><span class="default_value">0.5</span></em>, <em class="sig-param"><span class="n">rdelay</span><span class="o">=</span><span class="default_value">5</span></em>, <em class="sig-param"><span class="n">mdelay</span><span class="o">=</span><span class="default_value">1</span></em>, <em class="sig-param"><span class="n">ks</span><span class="o">=</span><span class="default_value">0.1</span></em>, <em class="sig-param"><span class="n">M</span><span class="o">=</span><span class="default_value">0.5</span></em>, <em class="sig-param"><span class="n">L</span><span class="o">=</span><span class="default_value">0.5</span></em>, <em class="sig-param"><span class="n">mflowmax</span><span class="o">=</span><span class="default_value">0.1</span></em>, <em class="sig-param"><span class="n">offset</span><span class="o">=</span><span class="default_value">0.0</span></em>, <em class="sig-param"><span class="n">factor1</span><span class="o">=</span><span class="default_value">1.0</span></em>, <em class="sig-param"><span class="n">factor2</span><span class="o">=</span><span class="default_value">1.0</span></em>, <em class="sig-param"><span class="n">power</span><span class="o">=</span><span class="default_value">0.0</span></em>, <em class="sig-param"><span class="n">vol</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">silofile</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">workspace</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprem.Model" title="Permalink to this definition">¶</a></dt>
@@ -529,7 +437,7 @@ Default values are provded for all parameters however the user is advised to upd
 
 </div>
 <div class="section" id="module-lumpyrem.lumprep">
-<span id="lumpyrem-lumprep-module"></span><h2>lumpyrem.lumprep module<a class="headerlink" href="#module-lumpyrem.lumprep" title="Permalink to this headline">¶</a></h2>
+<span id="lumprep"></span><h1>lumprep<a class="headerlink" href="#module-lumpyrem.lumprep" title="Permalink to this headline">¶</a></h1>
 <dl class="py class">
 <dt id="lumpyrem.lumprep.Simulation">
 <em class="property">class </em><code class="sig-prename descclassname">lumpyrem.lumprep.</code><code class="sig-name descname">Simulation</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">model_list</span></em>, <em class="sig-param"><span class="n">silofile</span></em>, <em class="sig-param"><span class="n">start_date</span></em>, <em class="sig-param"><span class="n">end_date</span></em>, <em class="sig-param"><span class="n">steps_per_day</span><span class="o">=</span><span class="default_value">1</span></em>, <em class="sig-param"><span class="n">nday_out</span><span class="o">=</span><span class="default_value">'monthly'</span></em>, <em class="sig-param"><span class="n">batch_file</span><span class="o">=</span><span class="default_value">'run.bat'</span></em>, <em class="sig-param"><span class="n">pest_control_file</span><span class="o">=</span><span class="default_value">'temp.pst'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lumprep.Simulation" title="Permalink to this definition">¶</a></dt>
@@ -654,8 +562,90 @@ Default values are provded for all parameters however the user is advised to upd
 </dd></dl>
 
 </div>
+<div class="section" id="module-lumpyrem.lr2series">
+<span id="lr2series"></span><h1>lr2series<a class="headerlink" href="#module-lumpyrem.lr2series" title="Permalink to this headline">¶</a></h1>
+<dl class="py class">
+<dt id="lumpyrem.lr2series.TimeSeries">
+<em class="property">class </em><code class="sig-prename descclassname">lumpyrem.lr2series.</code><code class="sig-name descname">TimeSeries</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">ts_file</span></em>, <em class="sig-param"><span class="n">lr_models</span></em>, <em class="sig-param"><span class="n">ts_names</span></em>, <em class="sig-param"><span class="n">lumprem_ouput_cols</span></em>, <em class="sig-param"><span class="n">div_delta_t</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">workspace</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class used to link a MODFLOW6 timeseries file to LUMPREM model outputs.</p>
+<dl class="py attribute">
+<dt id="lumpyrem.lr2series.TimeSeries.ts_file">
+<code class="sig-name descname">ts_file</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.ts_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>filename and path of MODFLOW6 timeseries file to write.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lr2series.TimeSeries.lr_models">
+<code class="sig-name descname">lr_models</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.lr_models" title="Permalink to this definition">¶</a></dt>
+<dd><p>list of lumpyrem Model objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lr2series.TimeSeries.ts_names">
+<code class="sig-name descname">ts_names</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.ts_names" title="Permalink to this definition">¶</a></dt>
+<dd><p>list of names for timeseries to include in the MODFLOW6 timeseries file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>list of str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lr2series.TimeSeries.lumprem_ouput_cols">
+<code class="sig-name descname">lumprem_ouput_cols</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.lumprem_ouput_cols" title="Permalink to this definition">¶</a></dt>
+<dd><p>list of LUMPREM output columns to import as timeseries. This list must match ts_names length and order.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>list of str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lr2series.TimeSeries.div_delta_t">
+<code class="sig-name descname">div_delta_t</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.div_delta_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>True (Default) if LR2SERIES div_delta_t. False if LR2SERIES no_div_delta_t .</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="lumpyrem.lr2series.TimeSeries.workspace">
+<code class="sig-name descname">workspace</code><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.workspace" title="Permalink to this definition">¶</a></dt>
+<dd><p>Path to workspace folder. Default is current working directory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>path</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="lumpyrem.lr2series.TimeSeries.write_ts">
+<code class="sig-name descname">write_ts</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.lr2series.TimeSeries.write_ts" title="Permalink to this definition">¶</a></dt>
+<dd><p>Writes the MODFLOW6 timeseries file.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
 <div class="section" id="module-lumpyrem.run">
-<span id="lumpyrem-run-module"></span><h2>lumpyrem.run module<a class="headerlink" href="#module-lumpyrem.run" title="Permalink to this headline">¶</a></h2>
+<span id="run"></span><h1>run<a class="headerlink" href="#module-lumpyrem.run" title="Permalink to this headline">¶</a></h1>
 <dl class="py function">
 <dt id="lumpyrem.run.run_process">
 <code class="sig-prename descclassname">lumpyrem.run.</code><code class="sig-name descname">run_process</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">process</span></em>, <em class="sig-param"><span class="n">path</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">commands</span><span class="o">=</span><span class="default_value">[]</span></em>, <em class="sig-param"><span class="n">print_output</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="headerlink" href="#lumpyrem.run.run_process" title="Permalink to this definition">¶</a></dt>
@@ -672,10 +662,6 @@ Default values are provded for all parameters however the user is advised to upd
 </dl>
 </dd></dl>
 
-</div>
-<div class="section" id="module-lumpyrem">
-<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-lumpyrem" title="Permalink to this headline">¶</a></h2>
-</div>
 </div>
 
 

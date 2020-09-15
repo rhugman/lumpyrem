@@ -22,8 +22,6 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`search`
 
-Code Description
-================
 
 Lumpyrem:
 ---------------

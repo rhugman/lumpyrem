@@ -122,8 +122,7 @@ class Model():
 
         if not os.path.exists(self.workspace):
             os.makedirs(self.workspace)
-
-        import numpy as np
+            
         outdays = np.linspace(1,numdays,noutdays, dtype=int)
 
         with open(file, 'w+') as f:
