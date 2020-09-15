@@ -1,0 +1,52 @@
+# File created using lumpyrem. 
+
+START_DATE 01/01/2000
+END_DATE 01/01/2010
+NDAY_OUT monthly
+STEPS_PER_DAY 1
+
+# Lumprem dataset number 1
+SILOFILE                         silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.5	
+RDELAY                          5.0	
+MDELAY                          1.0	
+KS                              0.1	
+M                               0.5	
+L                               0.5	
+MFLOWMAX                        0.1	
+OFFSET                          0.0	
+FACTOR1                         1.0	
+FACTOR2                         1.0	
+POWER                           0.0	
+VOL                             0.25	
+LUMPREM_MODEL_NAME              abc	
+
+# Lumprem dataset number 2
+SILOFILE                         silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.2	1.5
+IRRIGFILE                       1	1.0
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.5	
+RDELAY                          5.0	
+MDELAY                          1.0	
+KS                              0.1	
+M                               0.5	
+L                               0.5	
+MFLOWMAX                        0.1	
+OFFSET                          0.0	
+FACTOR1                         1.0	
+FACTOR2                         1.0	
+POWER                           0.0	
+VOL                             0.25	
+LUMPREM_MODEL_NAME              def	
+
+BATCH_FILE_NAME                  run.bat
+PEST_CONTROL_FILE                temp.pst
+
