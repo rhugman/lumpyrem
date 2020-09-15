@@ -20,4 +20,7 @@ Documentation is a work in progress. A Jupyter Notebook is provided with simple 
 
 LUMPREM and utilities are extensively documented.
 
+# To do
+* utility to read lumprem output and convert to Feflow timeseries/.pow files
+
 
