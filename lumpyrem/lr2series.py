@@ -1,5 +1,6 @@
 import os
 from lumpyrem import run
+import numpy as np
 
 class TimeSeries():
     """
@@ -22,7 +23,7 @@ class TimeSeries():
     """
 
     def __init__(self,ts_file, lr_models, ts_names,
-                      lumprem_ouput_cols, 
+                      lumprem_output_cols, 
                       div_delta_t=True, 
                       workspace=False):
         """Parameters
@@ -35,15 +36,15 @@ class TimeSeries():
             list of names for timeseries to include in the MODFLOW6 timeseries file.
         lumprem_ouput_cols : list of str
             list of LUMPREM output columns to import as timeseries. This list must match ts_names length and order.
-        div_delta_t : bool
-            True (Default) if LR2SERIES div_delta_t. False if LR2SERIES no_div_delta_t .
+        div_delta_t : bool or list
+            True (Default) if LR2SERIES div_delta_t. False if LR2SERIES no_div_delta_t. Alternatively a list of str can be provided. It must match the length and sequence of ts_names.
         workspace : path 
             Path to workspace folder. Default is current working directory.
         """
         
         model_count = len(lr_models)
         col_count = len(ts_names)
-        if col_count != len(lumprem_ouput_cols):
+        if col_count != len(lumprem_output_cols):
             print('ERROR! LUMPREM columns and timesereis names must be the same length.\n')
             return
         
@@ -55,10 +56,12 @@ class TimeSeries():
 
         if div_delta_t == True:
             self.div_delta = model_count*['div_delta_t']
+        elif div_delta_t == False:
+            self.div_delta = model_count*['no_div_delta_t']
         else:
-            elf.div_delta = model_count*['no_div_delta_t']
+            self.div_delta = div_delta_t
 
-        self.lumprem_ouput_cols = lumprem_ouput_cols
+        self.lumprem_output_cols = lumprem_output_cols
         self.ts_names = ts_names
 
         if workspace==False:
@@ -84,7 +87,7 @@ class TimeSeries():
                 f.write('#  my_name     LUMPREM_name      divide_by_delta_t?\n\n')
 
                 for col in range(count):
-                    f.write("\t{0}\t\t{1}\t\t{2}".format(self.ts_names[col]+'_'+model_name, self.lumprem_ouput_cols[col],self.div_delta[col]+'\n'))
+                    f.write("\t{0}\t\t{1}\t\t{2}".format(self.ts_names[col]+'_'+model_name, self.lumprem_output_cols[col],self.div_delta[col]+'\n'))
                 f.write('\n\n')
 
             f.write('WRITE_MF6_TIME_SERIES_FILE '+self.ts_file+' '+str(count*len(self.lr_models))+'\n')
@@ -101,3 +104,48 @@ class TimeSeries():
         filename = self.ts_file
         path = self.workspace
         run.run_process('lr2series', commands=[filename+'.in'],path=path)
+
+def read_ts(filename):
+    """Reads a modflow6 timeseries file and returns the timeseries as a rec array.
+
+    Parameters
+    ----------
+    filename : str
+        filename of ts file to read
+
+    Returns
+    -------
+    a : numpy recarray 
+        recarray with timesteps and timeseries value. Timeseries names are column names.
+    """
+
+    start = 0
+    textlist = []
+    with open(filename) as f:
+        for line in f:
+            if 'END ATTRIBUTES' in line.upper():
+                start = 0
+            elif start:
+                textlist.append([i for i in line.split()] )
+            elif 'BEGIN ATTRIBUTES' in line.upper():
+                start = 1
+
+    tsnames = textlist[0][1:]
+    methods = textlist[1][1:]
+    tsnames.insert(0, 'time')
+    tscount = len(tsnames)
+
+    start = 0
+    textlist = []
+    with open(filename) as f:
+        for line in f:
+            if 'END TIMESERIES' in line.upper():
+                start = 0
+            elif start:
+                #textlist.append([float(i) for i in line.split()] )
+                textlist.append(tuple([float(i) for i in line.split()]))
+            elif 'BEGIN TIMESERIES' in line.upper():
+                start = 1
+    a = np.array(textlist, dtype={'names':tsnames,
+                                'formats':tscount*['f8']})
+    return a

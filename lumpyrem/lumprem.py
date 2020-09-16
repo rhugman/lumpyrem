@@ -59,22 +59,22 @@ class Model():
 
         if silofile == True: #added to work with Instance class
             self.silofile = (silofile,'evap')
-        self.rainfile = 'rain.dat'
-        self.epotfile = 'epot.dat'
-        self.vegfile = (0.2, 1.5)
-        self.irrigfile = (1, 1.0)
-        self.maxvol = 0.5
-        self.irrigvolfrac = 0.5
-        self.rdelay = 5.0
-        self.mdelay = 1.0
-        self.ks = 0.1
-        self.M = 0.5
-        self.L = 0.5
-        self.mflowmax = 0.1
-        self.offset = 0.0
-        self.factor1 = 1.0
-        self.factor2 = 1.0
-        self.power = 0.0
+        self.rainfile = rainfile
+        self.epotfile = epotfile
+        self.vegfile = vegfile
+        self.irrigfile = irrigfile
+        self.maxvol = maxvol
+        self.irrigvolfrac = irrigvolfrac
+        self.rdelay = rdelay
+        self.mdelay = mdelay
+        self.ks = ks
+        self.M = M
+        self.L = L
+        self.mflowmax = mflowmax
+        self.offset = offset
+        self.factor1 = factor1
+        self.factor2 = factor2
+        self.power = power
         if vol ==False:
             self.vol = self.maxvol/2
         else:
