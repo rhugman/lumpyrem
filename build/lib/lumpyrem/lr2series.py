@@ -2,10 +2,44 @@ import os
 from lumpyrem import run
 
 class TimeSeries():
+    """
+    A class used to link a MODFLOW6 timeseries file to LUMPREM model outputs.
+
+    Attributes
+    ----------
+    ts_file : str
+        filename and path of MODFLOW6 timeseries file to write.
+    lr_models : list
+        list of lumpyrem Model objects.
+    ts_names : list of str
+        list of names for timeseries to include in the MODFLOW6 timeseries file.
+    lumprem_ouput_cols : list of str
+        list of LUMPREM output columns to import as timeseries. This list must match ts_names length and order.
+    div_delta_t : bool
+        True (Default) if LR2SERIES div_delta_t. False if LR2SERIES no_div_delta_t .
+    workspace : path 
+        Path to workspace folder. Default is current working directory.
+    """
+
     def __init__(self,ts_file, lr_models, ts_names,
                       lumprem_ouput_cols, 
                       div_delta_t=True, 
                       workspace=False):
+        """Parameters
+        ----------
+        ts_file : str
+            filename and path of MODFLOW6 timeseries file to write.
+        lr_models : list
+            list of lumpyrem Model objects.
+        ts_names : list of str
+            list of names for timeseries to include in the MODFLOW6 timeseries file.
+        lumprem_ouput_cols : list of str
+            list of LUMPREM output columns to import as timeseries. This list must match ts_names length and order.
+        div_delta_t : bool
+            True (Default) if LR2SERIES div_delta_t. False if LR2SERIES no_div_delta_t .
+        workspace : path 
+            Path to workspace folder. Default is current working directory.
+        """
         
         model_count = len(lr_models)
         col_count = len(ts_names)
@@ -34,6 +68,11 @@ class TimeSeries():
        
 
     def write_ts(self):
+        """Writes the MODFLOW6 timeseries file.
+
+        Parameters
+        ----------
+        """
         #number of columns to include in the ts file
         count = len(self.ts_names)
         ts_file = os.path.join(self.workspace, self.ts_file+'.in')
