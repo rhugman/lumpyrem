@@ -23,6 +23,9 @@ OFFSET                          0.0
 FACTOR1                         2.0	
 FACTOR2                         3.0	
 POWER                           0.5	
+ELEVMIN                         -9999.0	
+ELEVMAX                         10000.0	
+SURFACE                         0.0	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              abc	
 
@@ -44,6 +47,9 @@ OFFSET                          0.0
 FACTOR1                         2.0	
 FACTOR2                         3.0	
 POWER                           0.5	
+ELEVMIN                         -9999.0	
+ELEVMAX                         10000.0	
+SURFACE                         0.0	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              def	
 
@@ -65,6 +71,9 @@ OFFSET                          0.0
 FACTOR1                         2.0	
 FACTOR2                         3.0	
 POWER                           0.5	
+ELEVMIN                         -9999.0	
+ELEVMAX                         10000.0	
+SURFACE                         0.0	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              ghi	
 

@@ -1,13 +1,13 @@
 * earth properties 
-150  0.0
+1    0.0
 5    1   
 0.1  0.5  0.5  0.1 
 * volume to elevation
-150  1    2    0.1 
+150.0 1.0  2.0  0.1  -9999.0 10000.0
 * topographic surface
-150
+200
 * initial conditions
-75.0
+0.5
 1    1
 0.0 
 0.0 

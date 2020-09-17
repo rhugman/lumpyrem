@@ -48,6 +48,14 @@ class Model():
         factor2 in LUMPREM, used to adjust volume to elevation (default 1.0)
     power: float, optional
         power in LUMPREM, used to adjust volume to elevation (default 1.0)
+
+    elevmin : float, optional
+        (default 0.0)
+    elevmax : float, optional
+        (default 0.0)
+    surface : float, optional
+        (default 0.0)
+
     silofile : bool, optional
         This is to facilitate interaction with the LUMPREP simulation class (default False).
     workspace : path 
@@ -55,7 +63,7 @@ class Model():
     """
 
     def __init__(self, model_name,rainfile='rain.dat',epotfile='epot.dat',vegfile='veg.in',irrigfile='irrig.in',maxvol=0.5,irrigvolfrac=0.5,
-                rdelay=5,mdelay=1,ks=0.1,M=0.5,L=0.5,mflowmax=0.1,offset=0.0,factor1=2.0,factor2=3.0,power=0.5,vol=False, silofile=False, workspace=False):
+                rdelay=5,mdelay=1,ks=0.1,M=0.5,L=0.5,mflowmax=0.1,offset=0.0,factor1=2.0,factor2=3.0,power=0.5,elevmin=-9999.0, elevmax=10000.0,surface=0.0, vol=False, silofile=False, workspace=False):
 
         if silofile == True: #added to work with Instance class
             self.silofile = (silofile,'evap')
@@ -75,6 +83,9 @@ class Model():
         self.factor1 = factor1
         self.factor2 = factor2
         self.power = power
+        self.elevmin = elevmin
+        self.elevmax = elevmax
+        self.surface = surface
         if vol ==False:
             self.vol = self.maxvol/2
         else:
@@ -129,9 +140,9 @@ class Model():
                 numdays = (end_date-start_date).days
 
             if noutdays == 'monthly':
-                outdays=[]
-                date = start_date+ dt.timedelta(days=1)
-                while date < end_date:
+                outdays=[1]
+                date = start_date + dt.timedelta(days=1)
+                while date <= end_date:
                     if date.day == 1:
                         timestep = (date-start_date).days
                         outdays.append(timestep)
@@ -163,10 +174,10 @@ class Model():
             f.write("{0: <4} {1:<4} {2:<4} {3:<4}{4:}".format(self.ks,self.M,self.L,self.mflowmax,'\n'))
             
             f.write('* volume to elevation\n')
-            f.write("{0: <4} {1:<4} {2:<4} {3:<4}{4:}".format(self.offset,self.factor1,self.factor2,self.power,'\n'))
+            f.write("{0: <4} {1:<4} {2:<4} {3:<4} {4} {5}\n".format(self.offset,self.factor1,self.factor2,self.power,self.elevmin, self.elevmax))
             
             f.write('* topographic surface\n')
-            f.write("{0:}{1:}".format(self.offset,'\n'))
+            f.write("{0:}{1:}".format(self.surface,'\n'))
 
             f.write('* initial conditions\n')
             f.write("{0:}{1:}".format(self.vol,'\n'))
