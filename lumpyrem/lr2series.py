@@ -23,7 +23,7 @@ class TimeSeries():
     """
 
     def __init__(self,ts_file, lr_models, ts_names,
-                      lumprem_output_cols, 
+                      lumprem_output_cols,methods, 
                       div_delta_t=True, 
                       workspace=False):
         """Parameters
@@ -36,6 +36,8 @@ class TimeSeries():
             list of names for timeseries to include in the MODFLOW6 timeseries file.
         lumprem_ouput_cols : list of str
             list of LUMPREM output columns to import as timeseries. This list must match ts_names length and order.
+        methods : list of str
+            list of methdos to use in timeseries file. Must match sequence and length of ts_names.
         div_delta_t : bool or list
             True (Default) if LR2SERIES div_delta_t. False if LR2SERIES no_div_delta_t. Alternatively a list of str can be provided. It must match the length and sequence of ts_names.
         workspace : path 
@@ -51,7 +53,7 @@ class TimeSeries():
         self.ts_file = ts_file
         self.scales = model_count*[1]
         self.offsets = model_count*[0]
-        self.methods = model_count*['linearend']
+        self.methods = methods
         self.lr_models = lr_models
 
         if div_delta_t == True:
@@ -117,6 +119,8 @@ def read_ts(filename):
     -------
     a : numpy recarray 
         recarray with timesteps and timeseries value. Timeseries names are column names.
+    tsnames : list of str
+        list of timeseries names in the ts file
     """
 
     start = 0
@@ -131,9 +135,10 @@ def read_ts(filename):
                 start = 1
 
     tsnames = textlist[0][1:]
+    names = tsnames.copy()
+    names.insert(0, 'time')
     methods = textlist[1][1:]
-    tsnames.insert(0, 'time')
-    tscount = len(tsnames)
+    count = len(names)
 
     start = 0
     textlist = []
@@ -146,6 +151,8 @@ def read_ts(filename):
                 textlist.append(tuple([float(i) for i in line.split()]))
             elif 'BEGIN TIMESERIES' in line.upper():
                 start = 1
-    a = np.array(textlist, dtype={'names':tsnames,
-                                'formats':tscount*['f8']})
-    return a
+
+
+    a = np.array(textlist, dtype={'names':names,
+                                'formats':count*['f8']})
+    return a, tsnames, methods

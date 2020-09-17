@@ -47,7 +47,7 @@ class Model():
     factor 2: float, optional
         factor2 in LUMPREM, used to adjust volume to elevation (default 1.0)
     power: float, optional
-        fapower in LUMPREM, used to adjust volume to elevation (default 1.0)
+        power in LUMPREM, used to adjust volume to elevation (default 1.0)
     silofile : bool, optional
         This is to facilitate interaction with the LUMPREP simulation class (default False).
     workspace : path 
@@ -55,7 +55,7 @@ class Model():
     """
 
     def __init__(self, model_name,rainfile='rain.dat',epotfile='epot.dat',vegfile='veg.in',irrigfile='irrig.in',maxvol=0.5,irrigvolfrac=0.5,
-                rdelay=5,mdelay=1,ks=0.1,M=0.5,L=0.5,mflowmax=0.1,offset=0.0,factor1=1.0,factor2=1.0,power=0.0,vol=False, silofile=False, workspace=False):
+                rdelay=5,mdelay=1,ks=0.1,M=0.5,L=0.5,mflowmax=0.1,offset=0.0,factor1=2.0,factor2=3.0,power=0.5,vol=False, silofile=False, workspace=False):
 
         if silofile == True: #added to work with Instance class
             self.silofile = (silofile,'evap')
