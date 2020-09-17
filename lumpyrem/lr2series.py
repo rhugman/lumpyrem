@@ -25,7 +25,7 @@ class TimeSeries():
     def __init__(self,ts_file, lr_models, ts_names,
                       lumprem_output_cols,methods, 
                       div_delta_t=True, 
-                      workspace=False):
+                      workspace=False, scales=None):
         """Parameters
         ----------
         ts_file : str
@@ -42,6 +42,8 @@ class TimeSeries():
             True (Default) if LR2SERIES div_delta_t. False if LR2SERIES no_div_delta_t. Alternatively a list of str can be provided. It must match the length and sequence of ts_names.
         workspace : path 
             Path to workspace folder. Default is current working directory.
+        scales : list of float
+            list of floats to scale the lumprem outputs to. Must be in sequence and of same length as ts_names.
         """
         
         model_count = len(lr_models)
@@ -51,7 +53,10 @@ class TimeSeries():
             return
         
         self.ts_file = ts_file
-        self.scales = model_count*[1]
+        if scales == None:
+            self.scales = model_count*[1]
+        else:
+            self.scales = scales
         self.offsets = model_count*[0]
         self.methods = methods
         self.lr_models = lr_models
