@@ -1,0 +1,30 @@
+READ_LUMPREM_OUTPUT_FILE lr_abc.out 2
+#  my_name     LUMPREM_name      divide_by_delta_t?
+
+	rech_abc		net_recharge		div_delta_t
+	pumping_abc		gw_withdrawal		div_delta_t
+
+
+READ_LUMPREM_OUTPUT_FILE lr_def.out 2
+#  my_name     LUMPREM_name      divide_by_delta_t?
+
+	rech_def		net_recharge		div_delta_t
+	pumping_def		gw_withdrawal		div_delta_t
+
+
+READ_LUMPREM_OUTPUT_FILE lr_ghi.out 2
+#  my_name     LUMPREM_name      divide_by_delta_t?
+
+	rech_ghi		net_recharge		div_delta_t
+	pumping_ghi		gw_withdrawal		div_delta_t
+
+
+WRITE_MF6_TIME_SERIES_FILE rch.ts 6
+#	ts_name		scale		offset		mf6method
+
+	rech_abc		1		0		linearend	#abc
+	pumping_abc		1		0		linear	#abc
+	rech_def		1		0		linearend	#def
+	pumping_def		1		0		linear	#def
+	rech_ghi		1		0		linearend	#ghi
+	pumping_ghi		1		0		linear	#ghi

@@ -9,20 +9,20 @@ STEPS_PER_DAY 1
 SILOFILE                         silofile.txt	evap
 RAINFILE                        rain.dat	
 EPOTFILE                        epot.dat	
-VEGFILE                         0.2	1.5
-IRRIGFILE                       1	1.0
+VEGFILE                         0.5	1.0
+IRRIGFILE                       irrig.in	
 MAXVOL                          0.5	
 IRRIGVOLFRAC                    0.5	
-RDELAY                          5.0	
-MDELAY                          1.0	
+RDELAY                          5	
+MDELAY                          1	
 KS                              0.1	
 M                               0.5	
 L                               0.5	
 MFLOWMAX                        0.1	
 OFFSET                          0.0	
-FACTOR1                         1.0	
-FACTOR2                         1.0	
-POWER                           0.0	
+FACTOR1                         2.0	
+FACTOR2                         3.0	
+POWER                           0.5	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              abc	
 
@@ -30,22 +30,43 @@ LUMPREM_MODEL_NAME              abc
 SILOFILE                         silofile.txt	evap
 RAINFILE                        rain.dat	
 EPOTFILE                        epot.dat	
-VEGFILE                         0.2	1.5
-IRRIGFILE                       1	1.0
+VEGFILE                         0.5	1.0
+IRRIGFILE                       irrig.in	
 MAXVOL                          0.5	
 IRRIGVOLFRAC                    0.5	
-RDELAY                          5.0	
-MDELAY                          1.0	
+RDELAY                          5	
+MDELAY                          1	
 KS                              0.1	
 M                               0.5	
 L                               0.5	
 MFLOWMAX                        0.1	
 OFFSET                          0.0	
-FACTOR1                         1.0	
-FACTOR2                         1.0	
-POWER                           0.0	
+FACTOR1                         2.0	
+FACTOR2                         3.0	
+POWER                           0.5	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              def	
+
+# Lumprem dataset number 3
+SILOFILE                         silofile.txt	evap
+RAINFILE                        rain.dat	
+EPOTFILE                        epot.dat	
+VEGFILE                         0.5	1.0
+IRRIGFILE                       irrig.in	
+MAXVOL                          0.5	
+IRRIGVOLFRAC                    0.5	
+RDELAY                          5	
+MDELAY                          1	
+KS                              0.1	
+M                               0.5	
+L                               0.5	
+MFLOWMAX                        0.1	
+OFFSET                          0.0	
+FACTOR1                         2.0	
+FACTOR2                         3.0	
+POWER                           0.5	
+VOL                             0.25	
+LUMPREM_MODEL_NAME              ghi	
 
 BATCH_FILE_NAME                  run.bat
 PEST_CONTROL_FILE                temp.pst

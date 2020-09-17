@@ -88,7 +88,7 @@ class Model():
 
     
     def write_model(self, file=False, numdays=100, noutdays=None, nstep=1, 
-                          mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0]):
+                          mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0], start_date=None, end_date=None):
         """ Writes the LUMPREM model input files. 
         Default values are provded for all parameters however the user is advised to update those pertinnent to their case.
 
@@ -110,10 +110,40 @@ class Model():
             the recharge delay buffer for intial conditions. List of volumes assumed to have left soil moisture on previous days. First element left soil moisture on previous day. Second element two days previously, etc.
         mbuf : list, optional
             the macropore delay bufferfor intial conditions. Same setup as rbuf.
-        
+        start_date : str, optional
+            date on which simualtion starts in 'dd/mm/yyyy' format. If provided noutdays can be assigned as 'monthly' to get ouputs on calendar months intervals.
+        end_date : str, optional
+            date str in 'dd/mm/yyyy' format. Requires start_date to be provided. If end_date is provided, numdays is calculated as difference between start_date and end_date. If numdays is provided this value is superceded by the calculted value.       
         """
+
         if noutdays == None:
             noutdays = numdays
+        
+        if start_date != None:
+            start_date = dt.datetime.strptime(start_date, '%d/%m/%Y')
+
+            if end_date == None:
+                end_date = start_date + dt.timedelta(days=numdays)
+            else:
+                end_date = dt.datetime.strptime(end_date, '%d/%m/%Y')
+                numdays = (end_date-start_date).days
+
+            if noutdays == 'monthly':
+                outdays=[]
+                date = start_date+ dt.timedelta(days=1)
+                while date < end_date:
+                    if date.day == 1:
+                        timestep = (date-start_date).days
+                        outdays.append(timestep)
+                    date += dt.timedelta(days=1)
+                noutdays = len(outdays)
+
+            else:
+                outdays = np.linspace(1,numdays,noutdays, dtype=int)
+            
+        else:
+            outdays = np.linspace(1,numdays,noutdays, dtype=int)
+
 
         if file == False:
             file = 'lr_'+self.lumprem_model_name+'.in'
@@ -123,7 +153,7 @@ class Model():
         if not os.path.exists(self.workspace):
             os.makedirs(self.workspace)
             
-        outdays = np.linspace(1,numdays,noutdays, dtype=int)
+        
 
         with open(file, 'w+') as f:
             #f.write('# File written using lumpyrem \n')
