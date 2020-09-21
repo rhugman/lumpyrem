@@ -15,7 +15,7 @@ To install Lupyrem type:
     pip install lumpyrem
    
    
-# Documentaion
+# Documentation
 Documentation is a work in progress. A Jupyter Notebook is provided with simple examples of code functionality. 
 
 LUMPREM and utilities are extensively documented.
@@ -23,6 +23,7 @@ LUMPREM and utilities are extensively documented.
 # To do
 * deploy documentation to readthedocs
 * utility to read lumprem output and convert to Feflow timeseries/.pow files
+* utility to write PEST control files
 
 
 
