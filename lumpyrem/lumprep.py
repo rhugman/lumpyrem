@@ -56,7 +56,7 @@ class Simulation():
 			filename for the LUMPREP input file (default 'lumprep.in')
 		"""
 
-		infile = os.path.join(self.workspace,infile)
+		infile = os.path.join(self.workspace, infile)
 
 		if not os.path.exists(self.workspace):
 			os.makedirs(self.workspace)
@@ -81,7 +81,8 @@ class Simulation():
 			with open(infile, 'a') as f:
 				f.write('# Lumprem dataset number '+str(count)+'\n')
 				f.write("{0: <32} {1:}{2:}".format('SILOFILE', self.silofile[0],'\t'+str(self.silofile[1])+'\n'))
-
+				#f.write("{0: <32} {1:}{2:}".format('RAINFILE', os.path.join(self.workspace,'rain.dat'),'\n'))
+				#f.write("{0: <32} {1:}{2:}".format('EPOTFILE', os.path.join(self.workspace,'epot.dat'),'\n'))
 				for key in model_dict:
 					if type(model_dict[key]) == tuple:
 						input1 = model_dict[key][0]
@@ -91,7 +92,7 @@ class Simulation():
 						input2 = ''
 						if input1 == None:
 							continue
-					if key == 'workspace':
+					if key in ['workspace', 'elevmin', 'elevmax']:#, 'rainfile','epotfile']:
 						continue
 					f.write("{0: <32}{1:}{2:}".format(key.upper(), str(input1),'\t'+str(input2)+'\n'))
 				f.write('\n')
@@ -101,14 +102,15 @@ class Simulation():
 			f.write('\n')
 		f.close()
 
-		run.run_process('lumprep', commands=[infile])
+		lumprepin = os.path.basename(infile)
+		run.run_process('lumprep', commands=[lumprepin], path=self.workspace)
 
 	def run_simulation(self):
 		"""Runs LUMPREM on models created using LUMPREP in the Simulation object.
 		"""
 		for model in self.model_list:
 			model_name = model.lumprem_model_name
-			run.run_process('lumprem', commands=['lr_'+model_name+'.in','lr_'+model_name+'.out'])
+			run.run_process('lumprem', commands=['lr_'+model_name+'.in','lr_'+model_name+'.out'], path=self.workspace)
 
 	def get_results(self):
 		""" Reads the results from all LUMPREM models in the Simulation object and returns a Dataframe with parameters and results.
@@ -122,7 +124,7 @@ class Simulation():
 		results = pd.DataFrame()
 		for m in self.model_names:
 			abc = []
-			filename = 'lr_'+str(m)+'.out'
+			filename = os.path.join(self.workspace,'lr_'+str(m)+'.out')
 			textlist = []
 
 			with open(filename) as f:

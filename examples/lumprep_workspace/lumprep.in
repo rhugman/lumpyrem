@@ -9,7 +9,7 @@ STEPS_PER_DAY 1
 SILOFILE                         silofile.txt	evap
 RAINFILE                        rain.dat	
 EPOTFILE                        epot.dat	
-VEGFILE                         0.5	1.0
+VEGFILE                         0.1	1
 IRRIGFILE                       0	0.0
 MAXVOL                          0.5	
 IRRIGVOLFRAC                    0.5	
@@ -23,8 +23,6 @@ OFFSET                          0.0
 FACTOR1                         2.0	
 FACTOR2                         3.0	
 POWER                           0.5	
-ELEVMIN                         -9999.0	
-ELEVMAX                         10000.0	
 SURFACE                         0.0	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              abc	
@@ -33,7 +31,7 @@ LUMPREM_MODEL_NAME              abc
 SILOFILE                         silofile.txt	evap
 RAINFILE                        rain.dat	
 EPOTFILE                        epot.dat	
-VEGFILE                         0.5	1.0
+VEGFILE                         0.5	1
 IRRIGFILE                       0	0.0
 MAXVOL                          0.5	
 IRRIGVOLFRAC                    0.5	
@@ -47,8 +45,6 @@ OFFSET                          0.0
 FACTOR1                         2.0	
 FACTOR2                         3.0	
 POWER                           0.5	
-ELEVMIN                         -9999.0	
-ELEVMAX                         10000.0	
 SURFACE                         0.0	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              def	
@@ -57,7 +53,7 @@ LUMPREM_MODEL_NAME              def
 SILOFILE                         silofile.txt	evap
 RAINFILE                        rain.dat	
 EPOTFILE                        epot.dat	
-VEGFILE                         0.5	1.0
+VEGFILE                         0.9	1
 IRRIGFILE                       0	0.0
 MAXVOL                          0.5	
 IRRIGVOLFRAC                    0.5	
@@ -71,8 +67,6 @@ OFFSET                          0.0
 FACTOR1                         2.0	
 FACTOR2                         3.0	
 POWER                           0.5	
-ELEVMIN                         -9999.0	
-ELEVMAX                         10000.0	
 SURFACE                         0.0	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              ghi	
