@@ -19,9 +19,9 @@ class Model():
     epotfile : 
         name of evaporation file (default 'epot.dat').
     vegfile : str or tuple, optional
-        name of vegfile file or tuple with crop factor and gamma (default 'veg.in').
+        name of vegfile file or tuple with crop factor and gamma (default (0.5, 1)).
     irrigfile : str or tuple, optional
-        name of irrigation file or tuple with irrigation code and groundwater extraction fraction (default 'irrig.in').
+        name of irrigation file or tuple with irrigation code and groundwater extraction fraction (default (0, 0.0)).
     maxvol : float, optional
         volume of soil moisture (default 0.5)
     vol : float, optional
@@ -62,7 +62,7 @@ class Model():
         path to workspace folder. Default is current working directory
     """
 
-    def __init__(self, model_name,rainfile='rain.dat',epotfile='epot.dat',vegfile='veg.in',irrigfile='irrig.in',maxvol=0.5,irrigvolfrac=0.5,
+    def __init__(self, model_name,rainfile='rain.dat',epotfile='epot.dat',vegfile=(0.5, 1),irrigfile=(0,0.0),maxvol=0.5,irrigvolfrac=0.5,
                 rdelay=5,mdelay=1,ks=0.1,M=0.5,L=0.5,mflowmax=0.1,offset=0.0,factor1=2.0,factor2=3.0,power=0.5,elevmin=-9999.0, elevmax=10000.0,surface=0.0, vol=False, silofile=False, workspace=False):
 
         if silofile == True: #added to work with Instance class
@@ -99,7 +99,7 @@ class Model():
 
     
     def write_model(self, file=False, numdays=100, noutdays=None, nstep=1, 
-                          mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0], start_date=None, end_date=None):
+                          mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0], start_date=None, end_date=None, print_output=True):
         """ Writes the LUMPREM model input files. 
         Default values are provded for all parameters however the user is advised to update those pertinnent to their case.
 
@@ -211,18 +211,19 @@ class Model():
             else:
                 f.write("{0:}{1:}".format(self.irrigfile,'\n'))
         
-        print('LUMPREM model input file written to: \n'+file+'\n')
+        if print_output==True:
+            print('LUMPREM model input file written to: \n'+file+'\n')
     
-    def run_model(self):
+    def run_model(self, print_output=True):
         """Runs the LUMPREM on model.
         """
         model_name = self.lumprem_model_name
         path = self.workspace
-        run.run_process('lumprem', commands=['lr_'+model_name+'.in','lr_'+model_name+'.out'],path=path)
+        run.run_process('lumprem', commands=['lr_'+model_name+'.in','lr_'+model_name+'.out'],path=path, print_output=print_output)
 
 
 
-    def write_irigfile(self, numdays, irrig_start, fracyear=0.3, irrigfile='irrig.in',irrig_end=None, date_start='01/01/1900'):
+    def write_irigfile(self, numdays=None, irrig_start=0, fracyear=0.3, irrigfile='irrig.in',irrig_end=None, date_start='01/01/1900', date_end = None):
         """ Writes an irrigation input file to be used by LUMPREM.
 
         Parameters
@@ -238,6 +239,8 @@ class Model():
             optionally the first date on which irrigation ends can be provided instead of fracyear. Must be str in forrmat 'dd/mm/yyyy'(default None). Requires start_date and irrig_start in str date format as well.
         date_start : str, optional
             date on which simulation starts (default '01/01/1900'). This aids in accoutning for month lengths and leap years.
+        date_end : str, optional
+            date on which simulation ends (default None). If provided, this supercedes numdays. This aids in accoutning for month lengths and leap years.
         irrigfile : str, optional
             name of irrigation file to write (default 'irrig.in')
         """
@@ -256,7 +259,17 @@ class Model():
                 
 
         date_start = dt.datetime.strptime(date_start, '%d/%m/%Y')
-        irrig_start = date_start + dt.timedelta(days=int(irrig_start))
+
+        if type(date_end) == str:
+            numdays = dt.datetime.strptime(date_end, '%d/%m/%Y')
+        else:
+            numdays = date_start+dt.timedelta(days=numdays)
+
+
+        if type(irrig_start) == str:
+            irrig_start = dt.datetime.strptime(irrig_start, '%d/%m/%Y')
+        else:
+            irrig_start = date_start + dt.timedelta(days=int(irrig_start))
 
         if irrig_end == None:
             irrig_end = irrig_start + dt.timedelta(days=int(365*fracyear))
@@ -269,7 +282,7 @@ class Model():
         else:
             tsteps = [[1,0,0.0]]
 
-        numdays = date_start+dt.timedelta(days=numdays)
+        
 
         while irrig_start < numdays:
             tsteps.append([(irrig_start-date_start).days, 1,0.5])

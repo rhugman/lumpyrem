@@ -10,7 +10,7 @@ SILOFILE                         silofile.txt	evap
 RAINFILE                        rain.dat	
 EPOTFILE                        epot.dat	
 VEGFILE                         0.5	1.0
-IRRIGFILE                       irrig.in	
+IRRIGFILE                       0	0.0
 MAXVOL                          0.5	
 IRRIGVOLFRAC                    0.5	
 RDELAY                          5	
@@ -34,7 +34,7 @@ SILOFILE                         silofile.txt	evap
 RAINFILE                        rain.dat	
 EPOTFILE                        epot.dat	
 VEGFILE                         0.5	1.0
-IRRIGFILE                       irrig.in	
+IRRIGFILE                       0	0.0
 MAXVOL                          0.5	
 IRRIGVOLFRAC                    0.5	
 RDELAY                          5	
@@ -58,7 +58,7 @@ SILOFILE                         silofile.txt	evap
 RAINFILE                        rain.dat	
 EPOTFILE                        epot.dat	
 VEGFILE                         0.5	1.0
-IRRIGFILE                       irrig.in	
+IRRIGFILE                       0	0.0
 MAXVOL                          0.5	
 IRRIGVOLFRAC                    0.5	
 RDELAY                          5	

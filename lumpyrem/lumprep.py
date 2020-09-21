@@ -28,7 +28,7 @@ class Simulation():
 
 	"""
 
-	def __init__(self, model_list, silofile, start_date, end_date, steps_per_day = 1,nday_out ='monthly',batch_file = 'run.bat',pest_control_file = 'temp.pst'):
+	def __init__(self, model_list, silofile, start_date, end_date, steps_per_day = 1,nday_out ='monthly',batch_file = 'run.bat',pest_control_file = 'temp.pst', workspace=False):
 		self.start_date = start_date
 		self.end_date = end_date
 		self.nday_out = nday_out
@@ -42,6 +42,11 @@ class Simulation():
 		self.batch_file = batch_file
 		self.pest_control_file = pest_control_file
 		self.silofile = silofile
+		
+		if workspace==False:
+			self.workspace = os.getcwd()
+		else:
+			self.workspace = workspace
 
 	def write_simulation(self, infile='lumprep.in'):
 		"""Writes the LUMPREP input file from the Simulation object.
@@ -50,6 +55,11 @@ class Simulation():
 		infile : str
 			filename for the LUMPREP input file (default 'lumprep.in')
 		"""
+
+		infile = os.path.join(self.workspace,infile)
+
+		if not os.path.exists(self.workspace):
+			os.makedirs(self.workspace)
 		
 		unique_keys = ['start_date','end_date','nday_out','steps_per_day']
 		selfdict = self.__dict__
