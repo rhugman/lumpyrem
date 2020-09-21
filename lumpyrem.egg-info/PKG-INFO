@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: lumpyrem
-Version: 0.0.6
+Version: 0.0.7
 Summary: This package reads, writes and runs LUMPREM2 and associated utility programs
 Home-page: https://github.com/rhugman/lumpyrem
 Author: Rui Hugman
@@ -29,7 +29,9 @@ Description: # Lumpyrem
         LUMPREM and utilities are extensively documented.
         
         # To do
+        * deploy documentation to readthedocs
         * utility to read lumprem output and convert to Feflow timeseries/.pow files
+        
         
         
         

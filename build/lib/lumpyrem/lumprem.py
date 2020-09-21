@@ -19,9 +19,9 @@ class Model():
     epotfile : 
         name of evaporation file (default 'epot.dat').
     vegfile : str or tuple, optional
-        name of vegfile file or tuple with crop factor and gamma (default 'veg.in').
+        name of vegfile file or tuple with crop factor and gamma (default (0.5, 1)).
     irrigfile : str or tuple, optional
-        name of irrigation file or tuple with irrigation code and groundwater extraction fraction (default 'irrig.in').
+        name of irrigation file or tuple with irrigation code and groundwater extraction fraction (default (0, 0.0)).
     maxvol : float, optional
         volume of soil moisture (default 0.5)
     vol : float, optional
@@ -47,34 +47,45 @@ class Model():
     factor 2: float, optional
         factor2 in LUMPREM, used to adjust volume to elevation (default 1.0)
     power: float, optional
-        fapower in LUMPREM, used to adjust volume to elevation (default 1.0)
+        power in LUMPREM, used to adjust volume to elevation (default 1.0)
+
+    elevmin : float, optional
+        (default 0.0)
+    elevmax : float, optional
+        (default 0.0)
+    surface : float, optional
+        (default 0.0)
+
     silofile : bool, optional
         This is to facilitate interaction with the LUMPREP simulation class (default False).
     workspace : path 
         path to workspace folder. Default is current working directory
     """
 
-    def __init__(self, model_name,rainfile='rain.dat',epotfile='epot.dat',vegfile='veg.in',irrigfile='irrig.in',maxvol=0.5,irrigvolfrac=0.5,
-                rdelay=5,mdelay=1,ks=0.1,M=0.5,L=0.5,mflowmax=0.1,offset=0.0,factor1=1.0,factor2=1.0,power=0.0,vol=False, silofile=False, workspace=False):
+    def __init__(self, model_name,rainfile='rain.dat',epotfile='epot.dat',vegfile=(0.5, 1),irrigfile=(0,0.0),maxvol=0.5,irrigvolfrac=0.5,
+                rdelay=5,mdelay=1,ks=0.1,M=0.5,L=0.5,mflowmax=0.1,offset=0.0,factor1=2.0,factor2=3.0,power=0.5,elevmin=-9999.0, elevmax=10000.0,surface=0.0, vol=False, silofile=False, workspace=False):
 
         if silofile == True: #added to work with Instance class
             self.silofile = (silofile,'evap')
-        self.rainfile = 'rain.dat'
-        self.epotfile = 'epot.dat'
-        self.vegfile = (0.2, 1.5)
-        self.irrigfile = (1, 1.0)
-        self.maxvol = 0.5
-        self.irrigvolfrac = 0.5
-        self.rdelay = 5.0
-        self.mdelay = 1.0
-        self.ks = 0.1
-        self.M = 0.5
-        self.L = 0.5
-        self.mflowmax = 0.1
-        self.offset = 0.0
-        self.factor1 = 1.0
-        self.factor2 = 1.0
-        self.power = 0.0
+        self.rainfile = rainfile
+        self.epotfile = epotfile
+        self.vegfile = vegfile
+        self.irrigfile = irrigfile
+        self.maxvol = maxvol
+        self.irrigvolfrac = irrigvolfrac
+        self.rdelay = rdelay
+        self.mdelay = mdelay
+        self.ks = ks
+        self.M = M
+        self.L = L
+        self.mflowmax = mflowmax
+        self.offset = offset
+        self.factor1 = factor1
+        self.factor2 = factor2
+        self.power = power
+        self.elevmin = elevmin
+        self.elevmax = elevmax
+        self.surface = surface
         if vol ==False:
             self.vol = self.maxvol/2
         else:
@@ -88,7 +99,7 @@ class Model():
 
     
     def write_model(self, file=False, numdays=100, noutdays=None, nstep=1, 
-                          mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0]):
+                          mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0], start_date=None, end_date=None, print_output=True):
         """ Writes the LUMPREM model input files. 
         Default values are provded for all parameters however the user is advised to update those pertinnent to their case.
 
@@ -110,10 +121,40 @@ class Model():
             the recharge delay buffer for intial conditions. List of volumes assumed to have left soil moisture on previous days. First element left soil moisture on previous day. Second element two days previously, etc.
         mbuf : list, optional
             the macropore delay bufferfor intial conditions. Same setup as rbuf.
-        
+        start_date : str, optional
+            date on which simualtion starts in 'dd/mm/yyyy' format. If provided noutdays can be assigned as 'monthly' to get ouputs on calendar months intervals.
+        end_date : str, optional
+            date str in 'dd/mm/yyyy' format. Requires start_date to be provided. If end_date is provided, numdays is calculated as difference between start_date and end_date. If numdays is provided this value is superceded by the calculted value.       
         """
+
         if noutdays == None:
             noutdays = numdays
+        
+        if start_date != None:
+            start_date = dt.datetime.strptime(start_date, '%d/%m/%Y')
+
+            if end_date == None:
+                end_date = start_date + dt.timedelta(days=numdays)
+            else:
+                end_date = dt.datetime.strptime(end_date, '%d/%m/%Y')
+                numdays = (end_date-start_date).days
+
+            if noutdays == 'monthly':
+                outdays=[1]
+                date = start_date + dt.timedelta(days=1)
+                while date <= end_date:
+                    if date.day == 1:
+                        timestep = (date-start_date).days
+                        outdays.append(timestep)
+                    date += dt.timedelta(days=1)
+                noutdays = len(outdays)
+
+            else:
+                outdays = np.linspace(1,numdays,noutdays, dtype=int)
+            
+        else:
+            outdays = np.linspace(1,numdays,noutdays, dtype=int)
+
 
         if file == False:
             file = 'lr_'+self.lumprem_model_name+'.in'
@@ -123,7 +164,7 @@ class Model():
         if not os.path.exists(self.workspace):
             os.makedirs(self.workspace)
             
-        outdays = np.linspace(1,numdays,noutdays, dtype=int)
+        
 
         with open(file, 'w+') as f:
             #f.write('# File written using lumpyrem \n')
@@ -133,10 +174,10 @@ class Model():
             f.write("{0: <4} {1:<4} {2:<4} {3:<4}{4:}".format(self.ks,self.M,self.L,self.mflowmax,'\n'))
             
             f.write('* volume to elevation\n')
-            f.write("{0: <4} {1:<4} {2:<4} {3:<4}{4:}".format(self.offset,self.factor1,self.factor2,self.power,'\n'))
+            f.write("{0: <4} {1:<4} {2:<4} {3:<4} {4} {5}\n".format(self.offset,self.factor1,self.factor2,self.power,self.elevmin, self.elevmax))
             
             f.write('* topographic surface\n')
-            f.write("{0:}{1:}".format(self.offset,'\n'))
+            f.write("{0:}{1:}".format(self.surface,'\n'))
 
             f.write('* initial conditions\n')
             f.write("{0:}{1:}".format(self.vol,'\n'))
@@ -170,18 +211,19 @@ class Model():
             else:
                 f.write("{0:}{1:}".format(self.irrigfile,'\n'))
         
-        print('LUMPREM model input file written to: \n'+file+'\n')
+        if print_output==True:
+            print('LUMPREM model input file written to: \n'+file+'\n')
     
-    def run_model(self):
+    def run_model(self, print_output=True):
         """Runs the LUMPREM on model.
         """
         model_name = self.lumprem_model_name
         path = self.workspace
-        run.run_process('lumprem', commands=['lr_'+model_name+'.in','lr_'+model_name+'.out'],path=path)
+        run.run_process('lumprem', commands=['lr_'+model_name+'.in','lr_'+model_name+'.out'],path=path, print_output=print_output)
 
 
 
-    def write_irigfile(self, numdays, irrig_start, fracyear=0.3, irrigfile='irrig.in',irrig_end=None, date_start='01/01/1900'):
+    def write_irigfile(self, numdays=None, irrig_start=0, fracyear=0.3, irrigfile='irrig.in',irrig_end=None, date_start='01/01/1900', date_end = None):
         """ Writes an irrigation input file to be used by LUMPREM.
 
         Parameters
@@ -197,6 +239,8 @@ class Model():
             optionally the first date on which irrigation ends can be provided instead of fracyear. Must be str in forrmat 'dd/mm/yyyy'(default None). Requires start_date and irrig_start in str date format as well.
         date_start : str, optional
             date on which simulation starts (default '01/01/1900'). This aids in accoutning for month lengths and leap years.
+        date_end : str, optional
+            date on which simulation ends (default None). If provided, this supercedes numdays. This aids in accoutning for month lengths and leap years.
         irrigfile : str, optional
             name of irrigation file to write (default 'irrig.in')
         """
@@ -215,7 +259,17 @@ class Model():
                 
 
         date_start = dt.datetime.strptime(date_start, '%d/%m/%Y')
-        irrig_start = date_start + dt.timedelta(days=int(irrig_start))
+
+        if type(date_end) == str:
+            numdays = dt.datetime.strptime(date_end, '%d/%m/%Y')
+        else:
+            numdays = date_start+dt.timedelta(days=numdays)
+
+
+        if type(irrig_start) == str:
+            irrig_start = dt.datetime.strptime(irrig_start, '%d/%m/%Y')
+        else:
+            irrig_start = date_start + dt.timedelta(days=int(irrig_start))
 
         if irrig_end == None:
             irrig_end = irrig_start + dt.timedelta(days=int(365*fracyear))
@@ -228,7 +282,7 @@ class Model():
         else:
             tsteps = [[1,0,0.0]]
 
-        numdays = date_start+dt.timedelta(days=numdays)
+        
 
         while irrig_start < numdays:
             tsteps.append([(irrig_start-date_start).days, 1,0.5])
