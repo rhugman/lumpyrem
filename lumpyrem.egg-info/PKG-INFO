@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: lumpyrem
-Version: 0.0.7
+Version: 0.0.8
 Summary: This package reads, writes and runs LUMPREM2 and associated utility programs
 Home-page: https://github.com/rhugman/lumpyrem
 Author: Rui Hugman
@@ -23,7 +23,7 @@ Description: # Lumpyrem
             pip install lumpyrem
            
            
-        # Documentaion
+        # Documentation
         Documentation is a work in progress. A Jupyter Notebook is provided with simple examples of code functionality. 
         
         LUMPREM and utilities are extensively documented.
@@ -31,6 +31,7 @@ Description: # Lumpyrem
         # To do
         * deploy documentation to readthedocs
         * utility to read lumprem output and convert to Feflow timeseries/.pow files
+        * utility to write PEST control files
         
         
         
