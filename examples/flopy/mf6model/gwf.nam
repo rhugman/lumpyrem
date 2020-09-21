@@ -1,0 +1,13 @@
+BEGIN options
+END options
+
+BEGIN packages
+  CHD6  gwf.chd  chd_0
+  STO6  gwf.sto  sto
+  OC6  gwf.oc  oc
+  NPF6  gwf.npf  npf
+  IC6  gwf.ic  ic
+  DIS6  gwf.dis  dis
+  RCH6  gwf_1.rch  rch_1
+END packages
+

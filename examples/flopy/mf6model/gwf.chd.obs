@@ -1,0 +1,9 @@
+BEGIN options
+  DIGITS  9
+  PRINT_INPUT
+END options
+
+BEGIN continuous  FILEOUT  chd_flow.csv
+  chd  CHD  chd
+END continuous  FILEOUT  chd_flow.csv
+

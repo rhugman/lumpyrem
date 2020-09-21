@@ -1,0 +1,18 @@
+BEGIN options
+END options
+
+BEGIN timing
+  TDIS6  lumpyflo.tdis
+END timing
+
+BEGIN models
+  gwf6  gwf.nam  gwf
+END models
+
+BEGIN exchanges
+END exchanges
+
+BEGIN solutiongroup  1
+  ims6  lumpyflo.ims  gwf
+END solutiongroup  1
+
