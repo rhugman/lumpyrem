@@ -3,6 +3,7 @@ from . import lumprem
 from . import run
 from . import lumprep
 from . import lr2series
+from . import pest
 
 from os.path import dirname, basename, isfile
 import glob
