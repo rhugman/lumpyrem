@@ -140,7 +140,7 @@ class Model():
                 numdays = (end_date-start_date).days
 
             if noutdays == 'monthly':
-                outdays=[1]
+                outdays=[]
                 date = start_date + dt.timedelta(days=1)
                 while date <= end_date:
                     if date.day == 1:
@@ -150,10 +150,10 @@ class Model():
                 noutdays = len(outdays)
 
             else:
-                outdays = np.linspace(1,numdays,noutdays, dtype=int)
+                outdays = np.linspace(0,numdays,noutdays, dtype=int)[1:]
             
         else:
-            outdays = np.linspace(1,numdays,noutdays, dtype=int)
+            outdays = np.linspace(0,numdays,noutdays, dtype=int)[1:]
 
 
         if file == False:
