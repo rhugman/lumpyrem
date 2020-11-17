@@ -16,7 +16,7 @@ You can install Lupyrem from PyPi:
    
     pip install lumpyrem
    
-Or from the git-hub repository is recommended.
+Installing from the git-hub repository is recommended.
 
 
 # Documentation
