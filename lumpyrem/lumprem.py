@@ -99,7 +99,7 @@ class Model():
 
     
     def write_model(self, file=False, numdays=100, noutdays=None, nstep=1, 
-                          mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0], start_date=None, end_date=None, print_output=True):
+                          mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0], start_date=None, end_date=None, print_output=True, tpl=False):
         """ Writes the LUMPREM model input files. 
         Default values are provded for all parameters however the user is advised to update those pertinnent to their case.
 
@@ -160,6 +160,7 @@ class Model():
             file = 'lr_'+self.lumprem_model_name+'.in'
         
         file = os.path.join(self.workspace,file)
+        tpl = os.path.splitext(file)[0]+'.tpl'
 
         if not os.path.exists(self.workspace):
             os.makedirs(self.workspace)
@@ -212,7 +213,56 @@ class Model():
                 f.write("{0:}{1:}".format(self.irrigfile,'\n'))
         
         if print_output==True:
-            print('LUMPREM model input file written to: \n'+file+'\n')
+            print('LUMPREM model input file written to: \n'+file+'\n'+tpl)
+
+        # write the corresponding .tpl file
+        name = self.lumprem_model_name
+        if tpl!=False:
+            with open(tpl, 'w+') as f:
+                #f.write('# File written using lumpyrem \n')
+                f.write('ptf \n')
+                f.write('* earth properties \n')
+                f.write("{0: <4} {1:}{2:}".format(("$maxvol_"+name).ljust(13)+'$',("$irigvf_"+name).ljust(13)+'$','\n'))
+                f.write("{0: <4} {1:<4}{2:}".format(("$rdelay_"+name).ljust(13)+'$',("$mdelay_"+name).ljust(13)+'$','\n'))
+                f.write("{0: <4} {1:<4} {2:<4} {3:<4}{4:}".format(("$ks_"+name).ljust(13)+'$',("$m_"+name).ljust(13)+'$',("$l_"+name).ljust(13)+'$',("$mfmax_"+name).ljust(13)+'$','\n'))
+                
+                f.write('* volume to elevation\n')
+                f.write("{0: <4} {1:<4} {2:<4} {3:<4} {4} {5}\n".format(("$offset_"+name).ljust(13)+'$',("$f1_"+name).ljust(13)+'$',("$f2_"+name).ljust(13)+'$',("$power_"+name).ljust(13)+'$',self.elevmin, self.elevmax))
+                
+                f.write('* topographic surface\n')
+                f.write("{0:}{1:}".format(self.surface,'\n'))
+
+                f.write('* initial conditions\n')
+                f.write("{0:}{1:}".format(self.vol,'\n'))
+                f.write("{0: <4} {1:}{2:}".format(len(rbuf), len(mbuf),'\n'))
+                for i in rbuf:
+                    f.write("{0:}{1:}".format(i,' '))
+                f.write('\n')
+                for i in mbuf:
+                    f.write("{0:}{1:}".format(i,' '))
+                f.write('\n')
+                
+                f.write('* solution parameters\n')
+                f.write("{0: <4} {1:<4} {2:<4}{3:}".format(nstep,mxiter,tol,'\n'))
+                
+                f.write('* timing information\n')
+                f.write("{0: <4} {1:<4}{2:}".format(numdays,noutdays,'\n'))
+                for i in outdays:
+                    f.write("{0:}{1:}".format(i,' '))
+                f.write('\n')
+                
+                f.write('* data filenames\n')
+                if type(self.vegfile) == tuple:
+                    f.write("{0: <4} {1:}{2:}".format(("$crfac_"+name).ljust(13)+'$',("$gamma_"+name).ljust(13)+'$','\n'))
+                else:
+                    f.write("{0:}{1:}".format(self.vegfile,'\n'))
+                f.write("{0:}{1:}".format(self.rainfile,'\n'))
+                f.write("{0:}{1:}".format(self.epotfile,'\n'))
+                
+                if type(self.irrigfile) == tuple:
+                    f.write("{0: <4} {1:}{2:}".format(self.irrigfile[0],("$gwirfr_"+name).ljust(13)+'$','\n'))
+                else:
+                    f.write("{0:}{1:}".format(self.irrigfile,'\n'))
     
     def run_model(self, print_output=True):
         """Runs the LUMPREM on model.

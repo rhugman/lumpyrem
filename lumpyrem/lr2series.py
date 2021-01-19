@@ -25,7 +25,7 @@ class TimeSeries():
     def __init__(self,ts_file, lr_models, ts_names,
                       lumprem_output_cols,methods, 
                       div_delta_t=True, 
-                      workspace=False, scales=None):
+                      workspace=False, scales=None, timeoffset=' ', time_offset_method='next'):
         """Parameters
         ----------
         ts_file : str
@@ -49,7 +49,7 @@ class TimeSeries():
         model_count = len(lr_models)
         col_count = len(ts_names)
         if col_count != len(lumprem_output_cols):
-            print('ERROR! LUMPREM columns and timesereis names must be the same length.\n')
+            print('ERROR! LUMPREM columns and timeseries names must be the same length.\n')
             return
         
         self.ts_file = ts_file
@@ -75,7 +75,12 @@ class TimeSeries():
             self.workspace = os.getcwd()
         else:
             self.workspace = workspace
-       
+        self.timeoffset = timeoffset
+
+        if timeoffset != ' ':
+            self.time_offset_method = model_count*[time_offset_method]
+        else:
+            self.time_offset_method = model_count*['']
 
     def write_ts(self):
         """Writes the MODFLOW6 timeseries file.
@@ -97,12 +102,12 @@ class TimeSeries():
                     f.write("\t{0}\t\t{1}\t\t{2}".format(self.ts_names[col]+'_'+model_name, self.lumprem_output_cols[col],self.div_delta[col]+'\n'))
                 f.write('\n\n')
 
-            f.write('WRITE_MF6_TIME_SERIES_FILE '+self.ts_file+' '+str(count*len(self.lr_models))+'\n')
-            f.write("#\t{0}\t\t{1}\t\t{2}\t\t{3}".format('ts_name','scale','offset','mf6method\n\n'))
+            f.write('WRITE_MF6_TIME_SERIES_FILE '+self.ts_file+' '+str(count*len(self.lr_models))+' '+str(self.timeoffset)+'\n')
+            f.write("#\t{0}\t\t{1}\t\t{2}\t\t{3}\t\t{4}".format('ts_name','scale','offset','mf6method','time_offset_method\n\n'))
             for model in self.lr_models:
                 model_name = model.lumprem_model_name
                 for col in range(count):
-                        f.write("\t{0}\t\t{1}\t\t{2}\t\t{3}\t{4}".format(self.ts_names[col]+'_'+model_name, self.scales[col],self.offsets[col],self.methods[col], '#'+model_name+'\n'))
+                        f.write("\t{0}\t\t{1}\t\t{2}\t\t{3}\t{4}\t{5}".format(self.ts_names[col]+'_'+model_name, self.scales[col],self.offsets[col],self.methods[col], self.time_offset_method[col], '#'+model_name+'\n'))
 
         f.close()
         print('MF6 timeseries file '+ts_file+' written to:\n'+ts_file)
