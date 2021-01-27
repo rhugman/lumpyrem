@@ -24,7 +24,7 @@ def write_pst(controlfile, models):
                 param_grp += 2
 
     with open(controlfile, 'w+') as f:
-        f.write('pcf\n')
+        f.write('pcf $\n')
         f.write("* control data\n")
         f.write("restart estimation\n")
         f.write("{0}\t{1}\t{2}\t{3}\t{4}{5}".format(num_param, 0, param_grp,0,0,'\n'))
@@ -48,8 +48,8 @@ def write_pst(controlfile, models):
         f.write("l          relative  0.015   0.0        switch   2.0  parabolic\n")
         f.write("mfmax      relative  0.015   0.0001     switch   2.0  parabolic\n")
         f.write("offset     absolute  0.1     0.0        switch   2.0  parabolic\n")
-        f.write("fac1       relative  0.015   0.0        switch   2.0  parabolic\n")
-        f.write("fac2       relative  0.015   0.0        switch   2.0  parabolic\n")
+        f.write("f1       relative  0.015   0.0        switch   2.0  parabolic\n")
+        f.write("f2       relative  0.015   0.0        switch   2.0  parabolic\n")
         f.write("power      absolute  0.015   0.0        switch   2.0  parabolic\n")
         if param_grp >= 13:
             f.write("gwirfr     relative  0.015   0.0001     switch   2.0  parabolic\n")
@@ -68,11 +68,11 @@ def write_pst(controlfile, models):
             f.write("{0:<10}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}{10}".format("l_"+name, 'log', 'factor', m.L ,0.1,1.0,'l',1.0,0.0,1,'\n'))
             f.write("{0:<10}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}{10}".format("mfmax_"+name, 'log', 'factor', m.mflowmax ,0.1,1.0,'mfmax',1.0,0.0,1,'\n'))
             f.write("{0:<10}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}{10}".format("offset_"+name, 'none', 'relative', m.offset ,-1000.0,10000.0,'offset',1.0,0.0,1,'\n'))
-            f.write("{0:<10}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}{10}".format("fac1_"+name, 'log', 'factor', m.mflowmax ,1e-5,1e4,'fac1',1.0,0.0,1,'\n'))
-            f.write("{0:<10}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}{10}".format("fac2_"+name, 'log', 'factor', m.mflowmax ,1e-5,1e4,'fac2',1.0,0.0,1,'\n'))
+            f.write("{0:<10}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}{10}".format("f1_"+name, 'log', 'factor', m.mflowmax ,1e-5,1e4,'fac1',1.0,0.0,1,'\n'))
+            f.write("{0:<10}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}{10}".format("f2_"+name, 'log', 'factor', m.mflowmax ,1e-5,1e4,'fac2',1.0,0.0,1,'\n'))
             f.write("{0:<10}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}{10}".format("power_"+name, 'none', 'relative', m.power ,-3.0,3.0,'power',1.0,0.0,1,'\n'))
             if param_grp >= 13:
-                f.write("{0:<10}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}{10}".format("gwirfr_"+name, 'log', 'factor', m.irrigvolfrac ,-3.0,3.0,'gwirfr',1.0,0.0,1,'\n'))
+                f.write("{0:<10}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}{10}".format("gwirfr_"+name, 'log', 'factor', m.irrigvolfrac ,0.001,1.0,'gwirfr',1.0,0.0,1,'\n'))
             if param_grp >= 14:
                 f.write("{0:<10}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}{10}".format("crfac_"+name, 'log', 'factor', m.vegfile[0] ,0.001,3.0,'crfac',1.0,0.0,1,'\n'))
                 f.write("{0:<10}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}{10}".format("gamma_"+name, 'log', 'factor', m.vegfile[1] ,0.001,100.0,'gamma',1.0,0.0,1,'\n'))
