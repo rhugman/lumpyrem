@@ -215,7 +215,7 @@ class Model():
         # write the LUMPREM input file
         write_file(file, self)
         if print_output==True:
-            print('LUMPREM model input file written to: \n'+file+'\n')
+            print('LUMPREM model input file written to: \n'+file)
 
         # write the corresponding .tpl file
         name = self.lumprem_model_name
@@ -225,10 +225,14 @@ class Model():
             
             for p in params:
                 tmp.__dict__[p] = ("$"+p+"_"+name).ljust(13)+'$'
+                if p =='vegfile':
+                    tmp.__dict__[p] = (("$cropfac_"+name).ljust(13)+'$', ("$gamma_"+name).ljust(13)+'$')
+            if p =='irrigfile':
+                    tmp.__dict__[p] = (1, ("$gwirigfrac_"+name).ljust(13)+'$')
             write_file(tpl, tmp)
                 
             if print_output==True:
-                print('PEST template file written to: \n'+tpl)
+                print('PEST template file written to: \n'+tpl+'\n')
                 
     
     def run_model(self, print_output=True):
