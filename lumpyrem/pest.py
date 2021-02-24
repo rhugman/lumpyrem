@@ -48,8 +48,8 @@ def write_pst(controlfile, models):
         f.write("l          relative  0.015   0.0        switch   2.0  parabolic\n")
         f.write("mfmax      relative  0.015   0.0001     switch   2.0  parabolic\n")
         f.write("offset     absolute  0.1     0.0        switch   2.0  parabolic\n")
-        f.write("f1       relative  0.015   0.0        switch   2.0  parabolic\n")
-        f.write("f2       relative  0.015   0.0        switch   2.0  parabolic\n")
+        f.write("f1         relative  0.015   0.0        switch   2.0  parabolic\n")
+        f.write("f2         relative  0.015   0.0        switch   2.0  parabolic\n")
         f.write("power      absolute  0.015   0.0        switch   2.0  parabolic\n")
         if param_grp >= 13:
             f.write("gwirfr     relative  0.015   0.0001     switch   2.0  parabolic\n")
