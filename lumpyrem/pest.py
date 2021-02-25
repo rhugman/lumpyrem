@@ -1,5 +1,6 @@
 from lumpyrem import lumprem, run
 import os
+import pandas as pd
 
 class Pst():
     """ A Pest setup class. Facilities generating PEST control, template and instruction files from an ennsemble of LUMPREM models.
@@ -9,7 +10,7 @@ class Pst():
         self.models = models
 
 
-def write_pst(controlfile, models):
+def write_pst(controlfile, models, params='all'):
     # get number of parameters
     param_grp = 12
     num_param = 12*len(models)
