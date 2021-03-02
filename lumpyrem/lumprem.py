@@ -166,9 +166,11 @@ class Model():
             os.makedirs(self.workspace)
             
         
-        def write_file(file, obj):
+        def write_file(file, obj, template=False):
             with open(file, 'w+') as f:
                 #f.write('# File written using lumpyrem \n')
+                if template==True:
+                    f.write('ptf $\n')
                 f.write('* earth properties \n')
                 f.write("{0: <4} {1:}{2:}".format(obj.maxvol,obj.irrigvolfrac,'\n'))
                 f.write("{0: <4} {1:<4}{2:}".format(obj.rdelay,obj.mdelay,'\n'))
@@ -227,10 +229,9 @@ class Model():
                 tmp.__dict__[p] = ("$"+p+"_"+name).ljust(13)+'$'
                 if p =='vegfile':
                     tmp.__dict__[p] = (("$cropfac_"+name).ljust(13)+'$', ("$gamma_"+name).ljust(13)+'$')
-            if p =='irrigfile':
-                    tmp.__dict__[p] = (1, ("$gwirigfrac_"+name).ljust(13)+'$')
-            write_file(tpl, tmp)
-                
+                if p =='irrigfile':
+                        tmp.__dict__[p] = (1, ("$gwirigfrac_"+name).ljust(13)+'$')
+            write_file(tpl, tmp, template=True)     
             if print_output==True:
                 print('PEST template file written to: \n'+tpl+'\n')
                 
