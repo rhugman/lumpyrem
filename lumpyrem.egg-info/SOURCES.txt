@@ -4,6 +4,7 @@ lumpyrem/__init__.py
 lumpyrem/lr2series.py
 lumpyrem/lumprem.py
 lumpyrem/lumprep.py
+lumpyrem/pest.py
 lumpyrem/run.py
 lumpyrem.egg-info/PKG-INFO
 lumpyrem.egg-info/SOURCES.txt
