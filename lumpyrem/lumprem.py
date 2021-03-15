@@ -98,7 +98,7 @@ class Model():
             self.workspace = workspace
 
     
-    def write_model(self, file=False, numdays=100, noutdays=None, nstep=1, 
+    def write_model(self, file=False, numdays=100, noutdays=None, nstep=1, outdays=[],
                           mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0], start_date=None, end_date=None, print_output=True, tpl=False, params=[]):
         """ Writes the LUMPREM model input files. 
         Default values are provded for all parameters however the user is advised to update those pertinnent to their case.
@@ -113,6 +113,8 @@ class Model():
             number of days for which output is desired (default None, results in all days being recoreded)
         nstep : int, optonal
             number of steps into which each day is divided for iterative soil moisture computation (default 1)
+        outdays : int, list, optional
+            list of days on which outputs are to be recorded; length should match nstep
         mxiter : int, optional
             max iterations per step 9default 100)
         tol : float, optional
@@ -149,13 +151,17 @@ class Model():
                     date += dt.timedelta(days=1)
                 noutdays = len(outdays)
 
+            elif len(outdays)==0:
+                outdays =  np.linspace(0,numdays,noutdays, dtype=int)[1:]
             else:
-                outdays = np.linspace(0,numdays,noutdays, dtype=int)[1:]
+                outdays = outdays
             
+        elif len(outdays)==0:
+            outdays =  np.linspace(0,numdays,noutdays, dtype=int)[1:]
         else:
-            outdays = np.linspace(0,numdays,noutdays, dtype=int)[1:]
+            outdays = outdays
 
-
+            
         if file == False:
             file = 'lr_'+self.lumprem_model_name+'.in'
         
