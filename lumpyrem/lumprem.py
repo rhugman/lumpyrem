@@ -151,6 +151,18 @@ class Model():
                     date += dt.timedelta(days=1)
                 noutdays = len(outdays)
 
+            if noutdays == 'annual':
+                outdays=[]
+                date = start_date + dt.timedelta(days=1)
+                while date <= end_date:
+                    if date.month==1:
+                        if date.day == 1:
+                            timestep = (date-start_date).days
+                            outdays.append(timestep)
+                    date += dt.timedelta(days=1)
+                noutdays = len(outdays)
+
+
             elif len(outdays)==0:
                 outdays =  np.linspace(0,numdays,noutdays+1, dtype=int)[1:]
             else:
