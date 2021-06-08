@@ -152,12 +152,12 @@ class Model():
                 noutdays = len(outdays)
 
             elif len(outdays)==0:
-                outdays =  np.linspace(0,numdays,noutdays, dtype=int)[1:]
+                outdays =  np.linspace(0,numdays,noutdays+1, dtype=int)[1:]
             else:
                 outdays = outdays
             
         elif len(outdays)==0:
-            outdays =  np.linspace(0,numdays,noutdays, dtype=int)[1:]
+            outdays =  np.linspace(0,numdays,noutdays+1, dtype=int)[1:]
         else:
             outdays = outdays
 
