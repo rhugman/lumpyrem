@@ -25,7 +25,7 @@ class TimeSeries():
     def __init__(self,ts_file, lr_models, ts_names,
                       lumprem_output_cols,methods, 
                       div_delta_t=True, 
-                      workspace=False, scales=None, timeoffset=' ', time_offset_method='next', sep='_'):
+                      workspace=False, scales=None, timeoffset=' ', time_offset_method='next', sep='_', tssufix='modelname'):
         """Parameters
         ----------
         ts_file : str
@@ -44,6 +44,8 @@ class TimeSeries():
             Path to workspace folder. Default is current working directory.
         scales : list of float
             list of floats to scale the lumprem outputs to. Must be in sequence and of same length as ts_names.
+        tssufix: 'modelname', None or str
+            adds sufix to the ts names. Use None to pass tsnames epxlicitly. 'modelname' appends the LUMPREM model name. TO DO: curently only works for a single model.
         """
         
         model_count = len(lr_models)
@@ -54,22 +56,28 @@ class TimeSeries():
         
         self.ts_file = ts_file
         if scales == None:
-            self.scales = model_count*[1]
+            self.scales = col_count*[1]
         else:
             self.scales = scales
-        self.offsets = model_count*[0]
+        self.offsets = col_count*[0]
         self.methods = methods
         self.lr_models = lr_models
 
         if div_delta_t == True:
-            self.div_delta = model_count*['div_delta_t']
+            self.div_delta = col_count*['div_delta_t']
         elif div_delta_t == False:
-            self.div_delta = model_count*['no_div_delta_t']
+            self.div_delta = col_count*['no_div_delta_t']
         else:
             self.div_delta = div_delta_t
 
         self.lumprem_output_cols = lumprem_output_cols
-        self.ts_names = ts_names
+
+        if tssufix=='modelname':
+            self.ts_names = [i+sep+j.lumprem_model_name for i,j in zip(ts_names, col_count*lr_models)]
+        elif tssufix==None:
+            self.ts_names = ts_names
+        else:
+            self.ts_names = [i+sep+tssufix for i in ts_names]
 
         if workspace==False:
             self.workspace = os.getcwd()
@@ -78,9 +86,9 @@ class TimeSeries():
         self.timeoffset = timeoffset
 
         if timeoffset != ' ':
-            self.time_offset_method = model_count*[time_offset_method]
+            self.time_offset_method = col_count*[time_offset_method]
         else:
-            self.time_offset_method = model_count*['']
+            self.time_offset_method = col_count*['']
         
         self.sep = sep
 
@@ -101,7 +109,7 @@ class TimeSeries():
                 f.write('#  my_name     LUMPREM_name      divide_by_delta_t?\n\n')
 
                 for col in range(count):
-                    f.write("\t{0}\t\t{1}\t\t{2}".format(self.ts_names[col]+self.sep+model_name, self.lumprem_output_cols[col],self.div_delta[col]+'\n'))
+                    f.write("\t{0}\t\t{1}\t\t{2}".format(self.ts_names[col], self.lumprem_output_cols[col],self.div_delta[col]+'\n'))
                 f.write('\n\n')
 
             f.write('WRITE_MF6_TIME_SERIES_FILE '+self.ts_file+' '+str(count*len(self.lr_models))+' '+str(self.timeoffset)+'\n')
@@ -109,7 +117,7 @@ class TimeSeries():
             for model in self.lr_models:
                 model_name = model.lumprem_model_name
                 for col in range(count):
-                        f.write("\t{0}\t\t{1}\t\t{2}\t\t{3}\t{4}\t{5}".format(self.ts_names[col]+self.sep+model_name, self.scales[col],self.offsets[col],self.methods[col], self.time_offset_method[col], '#'+model_name+'\n'))
+                        f.write("\t{0}\t\t{1}\t\t{2}\t\t{3}\t{4}\t{5}".format(self.ts_names[col], self.scales[col],self.offsets[col],self.methods[col], self.time_offset_method[col], '#'+model_name+'\n'))
 
         f.close()
         print('MF6 timeseries file '+ts_file+' written to:\n'+ts_file)
