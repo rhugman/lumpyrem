@@ -31,7 +31,7 @@ LUMPREM and utilities are extensively documented by their developer.
 # To do
 * deploy documentation to readthedocs
 * utility to read lumprem output and convert to Feflow timeseries/.pow files
-* utility to write PEST control files
+* utility to write PEST template files **done**
 
 
 
