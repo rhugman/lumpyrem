@@ -32,6 +32,7 @@ LUMPREM and utilities are extensively documented by their developer.
 * deploy documentation to readthedocs
 * utility to read lumprem output and convert to Feflow timeseries/.pow files
 * utility to write PEST template files **done**
+* make OS independent
 
 # Funding
 Development of Lumpyrem has been supported in part by the Groundwater Modelling Decision Support Initiative (GMDSI). https://gmdsi.org/
