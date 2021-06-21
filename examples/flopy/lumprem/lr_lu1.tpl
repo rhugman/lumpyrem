@@ -1,3 +1,4 @@
+ptf $
 * earth properties 
 0.5  0.5                
 5    1   
@@ -20,4 +21,4 @@
 1.0  1.0
 rain.dat
 epot.dat
-1    0.5
+0    0

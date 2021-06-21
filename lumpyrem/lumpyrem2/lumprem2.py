@@ -296,25 +296,12 @@ class Model():
                 print('PEST template file written to: \n'+tpl+'\n')
                 
     
-    def run_model(self, print_output=True, version=1):
+    def run_model(self, print_output=True):
         """Runs the LUMPREM on model.
-        
-        Parameters
-        ----------
-        print_output : boolean, optional
-            optionaly print LUMPREM output to screen
-        version : int, optional
-            determines whether LUMPREM or LUMPREM2 is called. Note that if LUMPREM2 parameters are used in the input files an error will be returned
         """
         model_name = self.lumprem_model_name
         path = self.workspace
-
-        if version==1:
-            exe = 'lumprem'
-        if version==2:
-            exe = 'lumprem2'
-            
-        run.run_process(exe, commands=['lr_'+model_name+'.in','lr_'+model_name+'.out','lr_'+model_name+'.csv'],path=path, print_output=print_output)
+        run.run_process('lumprem2', commands=['lr_'+model_name+'.in','lr_'+model_name+'.out','lr_'+model_name+'.csv'],path=path, print_output=print_output)
 
 
 
@@ -370,6 +357,7 @@ class Model():
             irrig_end = irrig_start + dt.timedelta(days=int(365*fracyear))
         else:
             irrig_end = dt.datetime.strptime(irrig_end, '%d/%m/%Y')
+
 
         if irrig_start == 0:
             tsteps = [[1,1,0.5]]

@@ -26,6 +26,15 @@ POWER                           0.5
 SURFACE                         0.0	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              abc	
+MAXVOL_BR                       	
+EXTRAVOL_BR                     	
+GAMMA_BR                        	
+KS_BR                           	
+M_BR                            	
+L_BR                            	
+VOL_BR                          	
+EPOTFILE_BR                     	
+EPOT_BR_ALL                     	
 
 # Lumprem dataset number 2
 SILOFILE                         silofile.txt	evap
@@ -48,6 +57,15 @@ POWER                           0.5
 SURFACE                         0.0	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              def	
+MAXVOL_BR                       	
+EXTRAVOL_BR                     	
+GAMMA_BR                        	
+KS_BR                           	
+M_BR                            	
+L_BR                            	
+VOL_BR                          	
+EPOTFILE_BR                     	
+EPOT_BR_ALL                     	
 
 # Lumprem dataset number 3
 SILOFILE                         silofile.txt	evap
@@ -70,6 +88,15 @@ POWER                           0.5
 SURFACE                         0.0	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              ghi	
+MAXVOL_BR                       	
+EXTRAVOL_BR                     	
+GAMMA_BR                        	
+KS_BR                           	
+M_BR                            	
+L_BR                            	
+VOL_BR                          	
+EPOTFILE_BR                     	
+EPOT_BR_ALL                     	
 
 BATCH_FILE_NAME                  run.bat
 PEST_CONTROL_FILE                temp.pst
