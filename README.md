@@ -16,7 +16,7 @@ LUMPREM requires daily inputs of rainfall and potential ET. Nonlinear relationsh
 # Installation
 Lumpyrem requires LUMPREM, LUMPREP and LR2SERIES. Executables can be downloaded from the [PESTHomepage.org](https://pesthomepage.org/software-0). It is recomended these be placed in a folder in the environment path on your local machine. Alternatively, the executables may be placed within the workspace folder.
 
-You can install Lupyrem from PyPi:
+You can install Lumpyem from PyPi:
    
     pip install lumpyrem
    
