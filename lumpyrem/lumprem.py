@@ -60,6 +60,7 @@ class Model():
         This is to facilitate interaction with the LUMPREP simulation class (default False).
     workspace : path 
         path to workspace folder. Default is current working directory
+
     """
 
     def __init__(self, model_name,rainfile='rain.dat',epotfile='epot.dat',
@@ -113,7 +114,10 @@ class Model():
         self.epot_br_all=epot_br_all
     
     def write_model(self, file=False, numdays=100, noutdays=None, nstep=1, outdays=[],
-                          mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0], start_date=None, end_date=None, print_output=True, tpl=False, params=[]):
+                          mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0],
+                          start_date=None, end_date=None,
+                          print_output=True, tpl=False, params=[],
+                          ssf_outfile=None, ssf_start_date=None, ssf_start_time='00:00:00', ssf_var=[]):
         """ Writes the LUMPREM model input files. 
         Default values are provded for all parameters however the user is advised to update those pertinnent to their case.
 
@@ -141,6 +145,15 @@ class Model():
             date on which simualtion starts in 'dd/mm/yyyy' format. If provided noutdays can be assigned as 'monthly' to get ouputs on calendar months intervals.
         end_date : str, optional
             date str in 'dd/mm/yyyy' format. Requires start_date to be provided. If end_date is provided, numdays is calculated as difference between start_date and end_date. If numdays is provided this value is superceded by the calculted value.       
+        ssf_file : str, optional
+            file name of output ssf file
+        ssf_start_date : str, optional
+            date on which simualtion starts in 'dd/mm/yyyy' format. Default is equal to start_date
+        ssf_start_time: str, optional
+            time on which simualtion starts in 'hh/mm/ss' format. Default is equal to 00:00:00
+        ssf_var : list, optional
+            list of variables provided to LUMPREM to output SSF file. Must be list of lists (or list of tuples) in the format:
+            [lumprem output column name, output site name, scale, offset, lower bound, upper bound]
         """
 
         if noutdays == None:
@@ -196,6 +209,11 @@ class Model():
 
         if not os.path.exists(self.workspace):
             os.makedirs(self.workspace)
+
+        if ssf_start_date==None:
+            ssf_start_date=start_date
+        if any(isinstance(el, list) for el in ssf_var)==False:
+            ssf_var=[ssf_var]
             
         
         def write_file(file, obj, template=False):
@@ -273,6 +291,16 @@ class Model():
                     f.write("{0:}{1:}".format(obj.epotfile_br,'\n'))
                 elif obj.epot_br_all!='':
                     f.write("{0:}{1:}".format(obj.epot_br_all,'\n'))
+                
+                if ssf_outfile!=None:
+                    f.write('* ssf file\n')
+                    f.write(ssf_outfile+'\n')
+                    f.write(f'dd/mm/yyyy\t{ssf_start_date}\t{ssf_start_time}\n')
+                    f.write(f'{len(ssf_var)}\n')
+                    for i in ssf_var:
+                        for j in i:
+                            f.write(f'{j}\t')
+                        f.write('\n')
         
         # write the LUMPREM input file
         write_file(file, self)
