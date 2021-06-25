@@ -271,8 +271,13 @@ class Model():
                 
                 f.write('* timing information\n')
                 f.write("{0: <4} {1:<4}{2:}".format(numdays,noutdays,'\n'))
+                nlines=0
                 for i in outdays:
                     f.write("{0:}{1:}".format(i,' '))
+                    nlines+=1
+                    if nlines==10:
+                        f.write('\n')
+                        nlines=0
                 f.write('\n')
                 
                 f.write('* data filenames\n')
