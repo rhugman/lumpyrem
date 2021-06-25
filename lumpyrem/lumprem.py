@@ -275,7 +275,7 @@ class Model():
                 for i in outdays:
                     f.write("{0:}{1:}".format(i,' '))
                     nlines+=1
-                    if nlines==10:
+                    if (nlines==10) & (i!=outdays[-1]):
                         f.write('\n')
                         nlines=0
                 f.write('\n')
