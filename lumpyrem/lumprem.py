@@ -319,11 +319,13 @@ class Model():
             tmp = copy.deepcopy(self)
             
             for p in params:
-                tmp.__dict__[p] = ("$"+p+"_"+name).ljust(13)+'$'
+                predux = p[:2]
+                nameredux = name[:6]
+                tmp.__dict__[p] = ("$"+predux+"_"+nameredux).ljust(13)+'$'
                 if p =='vegfile':
-                    tmp.__dict__[p] = (("$cropfac_"+name).ljust(13)+'$', ("$gamma_"+name).ljust(13)+'$')
+                    tmp.__dict__[p] = (("$cf_"+nameredux).ljust(13)+'$', ("$gm_"+nameredux).ljust(13)+'$')
                 if p =='irrigfile':
-                        tmp.__dict__[p] = (1, ("$gwirigfrac_"+name).ljust(13)+'$')
+                        tmp.__dict__[p] = (1, ("$if_"+nameredux).ljust(13)+'$')
             write_file(tpl, tmp, template=True)     
             if print_output==True:
                 print('PEST template file written to: \n'+tpl+'\n')
