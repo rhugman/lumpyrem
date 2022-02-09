@@ -7,6 +7,8 @@ If you find a bug or think the software is not working as intended, please [subm
 Rui Hugman https://github.com/rhugman<br>
 Kevin Hayley https://github.com/khayley<br>
 
+[![DOI](https://zenodo.org/badge/294125928.svg)](https://zenodo.org/badge/latestdoi/294125928)
+
 # Introduction
 Lumpyrem is a Python package that facilitates interaction with the [LUMPREM lumped-parameter recharge model](https://s3.amazonaws.com/docs.pesthomepage.org/software/lumprem.zip) and its ancillary programs that assist in setup, and provide a linkage between LUMPREM and MODFLOW 6.
 It is intended to make setting up and running LUMPREM models easier, in particular if integrated into [Flopy](https://github.com/modflowpy/flopy) workflows. 
