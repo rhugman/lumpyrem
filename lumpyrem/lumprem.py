@@ -136,9 +136,7 @@ class Model():
             if vol_br==None:
                 vol_br=vol  
             self.vol_br     =vol_br
-
-            if epotfile_br==None:
-                epotfile_br=epotfile  
+ 
             self.epotfile_br=epotfile_br
 
             if epot_br_all==None:
