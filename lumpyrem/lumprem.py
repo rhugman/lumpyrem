@@ -61,6 +61,9 @@ class Model():
     workspace : path 
         path to workspace folder. Default is current working directory
 
+    second_bucket : bool, optional
+        Activates LUMREPM2 second bucket option. By default parameter values are equal to 1st bucket. 
+        Use same arg names + '_br' to assign parameter values.
     """
 
     def __init__(self, model_name,rainfile='rain.dat',epotfile='epot.dat',
@@ -68,6 +71,7 @@ class Model():
                 rdelay=5,mdelay=1,ks=0.1,M=0.5,L=0.5,mflowmax=0.1,offset=0.0,
                 factor1=2.0,factor2=3.0,power=0.5,elevmin=-9999.0, elevmax=10000.0,
                 surface=0.0, vol=False, silofile=False, workspace=False,
+                second_bucket=False,
                 maxvol_br=None, extravol_br=None, gamma_br=None,
                 ks_br=None, m_br=None, l_br=None, vol_br=None,
                 epotfile_br=None, epot_br_all=None):
@@ -102,16 +106,44 @@ class Model():
         if workspace==False:
             self.workspace = os.getcwd()
         else:
-            self.workspace = workspace       
-        self.maxvol_br  =maxvol_br
-        self.extravol_br=extravol_br
-        self.gamma_br   =gamma_br
-        self.ks_br      =ks_br
-        self.m_br       =m_br
-        self.l_br       =l_br
-        self.vol_br     =vol_br
-        self.epotfile_br=epotfile_br
-        self.epot_br_all=epot_br_all
+            self.workspace = workspace 
+        if second_bucket==True:
+
+            if maxvol_br==None:
+                maxvol_br=maxvol      
+            self.maxvol_br  =maxvol_br
+
+            if extravol_br==None:
+                extravol_br=0.0              
+            self.extravol_br=extravol_br
+
+            if gamma_br==None:
+                gamma_br=2.0  
+            self.gamma_br   =gamma_br
+
+            if ks_br==None:
+                ks_br=ks  
+            self.ks_br      =ks_br
+
+            if m_br==None:
+                m_br=M  
+            self.m_br       =m_br
+
+            if l_br==None:
+                l_br=L  
+            self.l_br       =l_br
+
+            if vol_br==None:
+                vol_br=vol  
+            self.vol_br     =vol_br
+
+            if epotfile_br==None:
+                epotfile_br=epotfile  
+            self.epotfile_br=epotfile_br
+
+            if epot_br_all==None:
+                epot_br_all=0  
+            self.epot_br_all=epot_br_all
     
     def write_model(self, file=False, numdays=100, noutdays=None, nstep=1, outdays=[],
                           mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0],
