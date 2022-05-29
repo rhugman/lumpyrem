@@ -26,6 +26,7 @@ POWER                           0.5
 SURFACE                         0.0	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              abc	
+SECOND_BUCKET                   False	
 MAXVOL_BR                       	
 EXTRAVOL_BR                     	
 GAMMA_BR                        	
@@ -57,6 +58,7 @@ POWER                           0.5
 SURFACE                         0.0	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              def	
+SECOND_BUCKET                   False	
 MAXVOL_BR                       	
 EXTRAVOL_BR                     	
 GAMMA_BR                        	
@@ -88,6 +90,7 @@ POWER                           0.5
 SURFACE                         0.0	
 VOL                             0.25	
 LUMPREM_MODEL_NAME              ghi	
+SECOND_BUCKET                   False	
 MAXVOL_BR                       	
 EXTRAVOL_BR                     	
 GAMMA_BR                        	

@@ -1,6 +1,7 @@
 import os
 from lumpyrem import run
 import numpy as np
+import itertools
 
 class TimeSeries():
     """
@@ -73,7 +74,7 @@ class TimeSeries():
         self.lumprem_output_cols = lumprem_output_cols
 
         if tssufix=='modelname':
-            self.ts_names = [i+sep+j.lumprem_model_name for i,j in zip(ts_names, col_count*lr_models)]
+            self.ts_names = [i+sep+j.lumprem_model_name for i,j in list(itertools.product(ts_names, lr_models))]
         elif tssufix==None:
             self.ts_names = ts_names
         else:
@@ -99,25 +100,29 @@ class TimeSeries():
         ----------
         """
         #number of columns to include in the ts file
-        count = len(self.ts_names)
+        count = len(self.lumprem_output_cols)
         ts_file = os.path.join(self.workspace, self.ts_file+'.in')
 
         with open(ts_file, 'w') as f:
-            for model in self.lr_models:
+            for i in range(len(self.lr_models)):
+                sel_tsnames = self.ts_names[i::len(self.lr_models)]
+                model = self.lr_models[i]
                 model_name = model.lumprem_model_name
                 f.write('READ_LUMPREM_OUTPUT_FILE lr_'+model_name+'.out '+str(count)+'\n')
                 f.write('#  my_name     LUMPREM_name      divide_by_delta_t?\n\n')
 
                 for col in range(count):
-                    f.write("\t{0}\t\t{1}\t\t{2}".format(self.ts_names[col], self.lumprem_output_cols[col],self.div_delta[col]+'\n'))
+                    f.write("\t{0}\t\t{1}\t\t{2}".format(sel_tsnames[col], self.lumprem_output_cols[col],self.div_delta[col]+'\n'))
                 f.write('\n\n')
 
             f.write('WRITE_MF6_TIME_SERIES_FILE '+self.ts_file+' '+str(count*len(self.lr_models))+' '+str(self.timeoffset)+'\n')
             f.write("#\t{0}\t\t{1}\t\t{2}\t\t{3}\t\t{4}".format('ts_name','scale','offset','mf6method','time_offset_method\n\n'))
-            for model in self.lr_models:
+            for i in range(len(self.lr_models)):
+                sel_tsnames = self.ts_names[i::len(self.lr_models)]
+                model = self.lr_models[i]
                 model_name = model.lumprem_model_name
                 for col in range(count):
-                        f.write("\t{0}\t\t{1}\t\t{2}\t\t{3}\t{4}\t{5}".format(self.ts_names[col], self.scales[col],self.offsets[col],self.methods[col], self.time_offset_method[col], '#'+model_name+'\n'))
+                        f.write("\t{0}\t\t{1}\t\t{2}\t\t{3}\t{4}\t{5}".format(sel_tsnames[col], self.scales[col],self.offsets[col],self.methods[col], self.time_offset_method[col], '#'+model_name+'\n'))
 
         f.close()
         print('MF6 timeseries file '+ts_file+' written to:\n'+ts_file)

@@ -107,41 +107,36 @@ class Model():
             self.workspace = os.getcwd()
         else:
             self.workspace = workspace 
+        
+        self.second_bucket=second_bucket
+        # set defaults
         if second_bucket==True:
-
             if maxvol_br==None:
                 maxvol_br=maxvol      
-            self.maxvol_br  =maxvol_br
-
             if extravol_br==None:
-                extravol_br=0.0              
-            self.extravol_br=extravol_br
-
+                extravol_br=0.0        
             if gamma_br==None:
                 gamma_br=2.0  
-            self.gamma_br   =gamma_br
-
             if ks_br==None:
-                ks_br=ks  
-            self.ks_br      =ks_br
-
+                ks_br=ks      
             if m_br==None:
-                m_br=M  
-            self.m_br       =m_br
-
+                m_br=M
             if l_br==None:
-                l_br=L  
-            self.l_br       =l_br
-
+                l_br=L
             if vol_br==None:
-                vol_br=vol  
-            self.vol_br     =vol_br
- 
-            self.epotfile_br=epotfile_br
-
+                vol_br=vol
             if epot_br_all==None:
-                epot_br_all=0  
-            self.epot_br_all=epot_br_all
+                epot_br_all=0
+
+        self.maxvol_br =maxvol_br
+        self.extravol_br=extravol_br
+        self.gamma_br   =gamma_br
+        self.ks_br      =ks_br
+        self.m_br       =m_br
+        self.l_br       =l_br
+        self.vol_br     =vol_br
+        self.epotfile_br=epotfile_br
+        self.epot_br_all=epot_br_all
     
     def write_model(self, file=False, numdays=100, noutdays=None, nstep=1, outdays=[],
                           mxiter=100, tol=1.0e-5, rbuf =[0.0], mbuf=[0.0],
