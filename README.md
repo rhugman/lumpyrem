@@ -4,20 +4,65 @@ A Python port of the [LUMPREM](https://pesthomepage.org) lumped-parameter
 recharge model, adding array-based forcing and output, a modern API, and
 compiled-speed execution.
 
-**Status: Phase 1 complete.** The reference oracle is in place and the model
-kernel reproduces it bit-for-bit. The designed Python API arrives in Phase 2.
-See [docs/conversion-plan.md](docs/conversion-plan.md) for the full plan.
+**Status: Phase 2 complete.** The reference oracle is in place, the model
+kernel reproduces it bit-for-bit, and the Python API is built on top — real
+dates, typed parameters, explicit resampling. Array-based and compiled
+execution arrive in Phase 3. See
+[docs/conversion-plan.md](docs/conversion-plan.md) for the full plan.
+
+## Using it
+
+```python
+import lumpyrem as lr
+
+forcing = lr.Forcing.from_csv("climate.csv")        # or a DataFrame, dict, arrays
+model = lr.Model(
+    upper=lr.UpperStore(maxvol=300.0, ks=3.0, m=0.4, l=0.5, mflowmax=1.5, rdelay=2.0),
+    solver=lr.Solver(nstep=5),
+)
+results = model.run(forcing, times="MS")            # month-start output
+results.df["total_rech"]                            # a pandas Series
+results.balance_error()                             # how well the run closes
+```
+
+Forcing comes from a DataFrame, a NumPy array, a CSV or a dict, at whatever
+frequency it was observed. Output times are a frequency string, a list of dates
+or explicit day numbers. Row *k* of the results covers the interval *ending* at
+its own timestamp, which is the convention a MODFLOW stress period uses.
+
+A run that fails to converge warns instead of pretending; `Solver` takes
+`on_nonconvergence="raise"` or `"ignore"` if you would rather it did something
+else.
+
+### Gap-filling is a choice, not a file format
+
+`lumprem2.f` fills gaps in its forcing by three different rules, decided by
+which file a value happened to be written in. The rules are sensible; their
+invisibility is not. Here they are named, defaulted to the Fortran's choices,
+and per-variable overridable:
+
+| variable | default rule |
+|---|---|
+| `rainfall` | zero-fill — rain does not persist |
+| `pot_evap`, `irrigate`, `gw_irrig_frac`, `pot_evap_lower` | forward-fill as steps |
+| `crop_factor`, `veg_gamma` | linear interpolation |
+
+```python
+lr.Forcing.from_dataframe(df, fill={"rainfall": "forward"})
+```
 
 ## What is here
 
 `lumpyrem.core` is a faithful scalar port of LUMPREM2's `rechmod` kernel and its
 simulation loop. It reproduces the Fortran **bit-for-bit — 0 ULP on every column
-of all 209 reference cases**, against a gate that allows 10. It takes floats and
-sequences and returns arrays; the designed API is Phase 2's job.
+of all 209 reference cases**, against a gate that allows 10. Everything above it
+— `parameters`, `forcing`, `model`, `results` — is designed rather than
+translated, and is held to reproducing those same numbers exactly.
 
 Fidelity is not just asserted. `tests/test_kernel_mutations.py` reintroduces
 each known trap in turn and requires the golden set to reject it, which is what
-found the two demotions and the one real coverage gap recorded in the plan.
+found the two demotions and the one real coverage gap recorded in the plan; the
+API layer is checked the same way, by mis-marshalling a run on purpose.
 
 ## The reference oracle
 
@@ -69,8 +114,11 @@ real figure on all three platforms.
 
 The golden files record what LUMPREM2 *does*, which in two situations is not
 what it intends — its own water-balance column does not close. Both are pinned
-by dedicated cases and documented in `tests/oracle/defects.py`. Phase 1 must
-decide explicitly whether the port reproduces them or departs from them.
+by dedicated cases and documented in `tests/oracle/defects.py`. The port
+**reproduces** them: the fidelity gate is bit-identity and both defects are in
+the golden files, so a mass-conserving alternative belongs above the kernel as
+an opt-in rather than silently inside it. `Results.balance_error()` is the
+place to notice one.
 
 ## Licence
 

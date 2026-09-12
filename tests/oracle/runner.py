@@ -22,12 +22,22 @@ class OracleRun:
     stdout: str
 
 
-def run_case(exe: Path, case: Case, workdir: Path, keep: bool = False) -> OracleRun:
-    """Write ``case`` into ``workdir``, run ``exe``, and read the results back."""
+def run_case(exe: Path, case: Case, workdir: Path, keep: bool = False,
+             rewrite=None) -> OracleRun:
+    """Write ``case`` into ``workdir``, run ``exe``, and read the results back.
+
+    ``rewrite``, if given, is called with the working directory after the case
+    has been written and before the binary runs.  It exists so that the
+    gap-filling tests can replace the dense forcing files with sparse ones and
+    see what the reference does with them -- the one thing dense cases are
+    built never to exercise.
+    """
     workdir = Path(workdir)
     if workdir.exists() and not keep:
         shutil.rmtree(workdir)
     infile = case.write(workdir)
+    if rewrite is not None:
+        rewrite(workdir)
 
     proc = subprocess.run(
         [str(Path(exe).resolve()), infile.name, "case.out", "case.csv"],

@@ -9,15 +9,16 @@ description = "Lumped-parameter recharge modelling, a Python port of LUMPREM"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-dependencies = ["numpy>=1.24"]
+dependencies = ["numpy>=1.24", "pandas>=2.0"]
 
 [project.optional-dependencies]
 # Numba's supported NumPy ceiling is why this is pinned; see docs/conversion-plan.md
 # section 7.  Phase 3 settles whether Numba delivers before the array API is
 # built on top of it.
 fast = ["numba>=0.60", "numpy<2.4"]
-test = ["pytest>=7", "numpy>=1.24"]
-dev = ["pytest>=7", "ruff>=0.6", "numpy>=1.24"]
+plot = ["matplotlib>=3.7"]
+test = ["pytest>=7", "matplotlib>=3.7"]
+dev = ["pytest>=7", "ruff>=0.6", "matplotlib>=3.7"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/lumpyrem"]
@@ -43,3 +44,8 @@ select = ["E", "F", "I", "UP", "B", "SIM", "NPY"]
 # parameter names and its nested branch structure so the correspondence stays
 # checkable line by line; collapsing the nesting would hide it.
 "src/lumpyrem/core.py" = ["E741", "SIM102"]
+# "l" is what both manuals and the soil-physics literature call the Mualem
+# pore-connectivity exponent; renaming it in the public API would cost more
+# than it saves.
+"src/lumpyrem/parameters.py" = ["E741"]
+"tests/api_compare.py" = ["E741"]

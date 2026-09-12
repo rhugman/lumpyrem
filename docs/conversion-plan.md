@@ -174,8 +174,8 @@ bit-fidelity; everything above it is free to be designed rather than translated.
 | Layer | Module | Responsibility |
 |---|---|---|
 | **Kernel** | `lumpyrem.core` | Numba-compiled `rechmod`; float64 scalars and arrays only, no I/O, no objects. The thing that must be bit-faithful. |
-| **Model** | `lumpyrem.model` | `Model` and `ModelGrid`: typed parameter objects, forcing, solver settings, `.run()` → results. |
-| **I/O** | `lumpyrem.io` | Forcing in from DataFrame / array / CSV / netCDF; results out as DataFrame, xarray or CSV. No fixed-format files. |
+| **Model** | `lumpyrem.model`, `lumpyrem.parameters` | `Model` and `ModelGrid`: typed parameter objects, forcing, solver settings, `.run()` → results. |
+| **I/O** | `lumpyrem.forcing`, `lumpyrem.results` | Forcing in from DataFrame / array / CSV / netCDF; results out as DataFrame, xarray or CSV. No fixed-format files. *Built as constructors and methods rather than a separate `lumpyrem.io`; see Phase 2.* |
 | **Coupling** | `lumpyrem.mf6` | MODFLOW 6 handoff via flopy, MF6 time series, and pyEMU parameterisation for calibration. |
 | *— tests only —* | `tests/oracle` | Legacy `.in` writer and tabular reader, used solely to drive and read the Fortran reference. Never imported by the package. |
 
@@ -249,7 +249,7 @@ case exercised trap 5 at all until `empty_store_fixup` was added for it.
 > 0 ULP** — every column of every case is bit-identical, not merely within
 > budget. The budget stays at 10 so that Phase 3's reordering has room.
 
-### Phase 2 — The Python API (1–2 weeks)
+### Phase 2 — The Python API (1–2 weeks) — **complete**
 
 Where the "easier user interface" goal is delivered. With no legacy format to
 preserve, this layer is designed from scratch against how the model is actually
@@ -268,9 +268,39 @@ used.
 - Results as a DataFrame with named columns, plus `.balance_error()`, `.plot()`,
   and `.to_csv()`.
 
+*As built:* `lumpyrem.parameters`, `lumpyrem.forcing`, `lumpyrem.model` and
+`lumpyrem.results`. `Model.run(forcing, times=...)` marshals the objects into
+the Phase 1 function call and labels what comes back; it adds no arithmetic of
+its own, which is what makes the gate below an equality rather than a budget.
+
+Three decisions worth recording:
+
+- **Validation is stricter than the reference, deliberately.** Where
+  `lumprem2.f` silently clamps — `gamma_br` into [0.1, 10], both delays at
+  `MAXDELAY - 2` — the objects refuse. A silently clamped parameter is worse
+  than an error inside a calibration loop, because the knob keeps turning and
+  the model stops responding to it. `veg_gamma <= 0` is rejected too; the
+  Fortran evaluates 0/0 there and carries the NaN onwards without comment.
+- **A timestamp labels the end of the interval it summarises.** Day 1 covers
+  `[start, start + 1 day)`, so an output stamp marks the instant a reporting
+  interval closes, and row 0 sits at `start` carrying the initial state. Flux
+  columns are interval totals under that convention, which is the same one a
+  MODFLOW stress period uses — worth settling now rather than during Phase 4.
+- **`lumpyrem.io` was folded in rather than built.** Section 4 sketches a
+  separate I/O module, but every reader is a `Forcing` constructor and every
+  writer a `Results` method, so a separate module would have held two
+  re-exports. It gets content of its own in Phase 3, when xarray and netCDF
+  arrive, and can be introduced then.
+
 > **Gate** — Every golden case, expressed through the object API, still
 > reproduces the Phase 1 numbers exactly. Resampling options are tested
-> independently against hand-built cases.
+> independently against hand-built cases. **Met, at 0 ULP**, and the gate was
+> checked for teeth the way Phase 1 checked the kernel: four deliberate
+> marshalling slips — swapped exponents, swapped delays, a schedule shifted by
+> one day, a series plumbed to the wrong variable — are each required to fail
+> it. The resampling half went further than hand-built cases: the reference is
+> driven from genuinely *sparse* forcing files, which the dense Phase 0 cases
+> were designed never to produce, and the Python rules reproduce it exactly.
 
 ### Phase 3 — Array-based and compiled (2–3 weeks)
 
@@ -398,10 +428,12 @@ They belong in the porting checklist and, ideally, as named test cases.
     interpolated between listed days; potential evaporation and irrigation are
     forward-filled as steps; rainfall is zero-filled. This is the one trap that is
     no longer a fidelity risk — Phase 0 generates dense daily forcing so the rules
-    never fire during oracle comparison, and Phase 2 re-exposes them as explicit
-    resampling options. It stays on the list because the defaults should still
-    match these, and because applying one rule to all three remains the easiest
-    way to get plausible but wrong answers.
+    never fire during oracle comparison. *Closed in Phase 2:* they are now named
+    options on `Forcing`, defaulted to these three and overridable per variable,
+    and checked against the reference driven from genuinely sparse forcing
+    files. Applying one rule to all three remains the easiest way to get
+    plausible but wrong answers, which is why the rule is visible in the API
+    rather than implied by a file name.
 12. **Enabling the lower store re-routes the delays.** Without it, recharge is
     upper-store drainage plus macropore flow and both are delayed. With it,
     upper-store drainage is delayed on the way *into* the lower store, and only
@@ -430,6 +462,22 @@ They belong in the porting checklist and, ideally, as named test cases.
     `1.00000001335143196e-10`, not `1e-10`. With a negative `power` the
     difference reaches 7e-4, which is millions of ULP. A port that writes the
     constant the obvious way fails the gate.
+
+16. **Interpolation multiplies by a reciprocal rather than dividing.**
+    *Found in Phase 2.* The vegetation gap-fill computes `1/(d2 - d1)` once per
+    segment and multiplies each day's offset by it, instead of dividing per
+    day. The two disagree in the last bit — `np.interp` over days 1 to 11 gives
+    exactly 3.0 where `lumprem2.f` gives 3.0000000000000004 — so a port that
+    reaches for the obvious library call cannot match the reference on sparse
+    forcing. Invisible under the dense Phase 0 cases, which is why it took
+    until Phase 2 to surface.
+
+    The same reading turned up a branch the reference cannot reach: a
+    vegetation file with a single entry is held flat, but a separate check
+    insists the last listed day reach the end of the simulation, so the branch
+    only runs for a one-day model. `Fill.INTERPOLATE` keeps the sensible
+    behaviour — one listed value *is* a constant — and this is the one place
+    Phase 2 accepts input the reference would reject.
 
 Traps 13 and 14 are the only two places where the reference's own water balance
 fails to close. Both are reproducible, both are recorded in
@@ -488,10 +536,15 @@ of the `rtemp**m` term. The Picard iteration is therefore never formally
 contractive near a full store, and a saturated store with a small `m` oscillates
 and never converges — **raising `nstep` makes it worse, not better**, since more
 substeps spend more time pinned against the singularity. 36 of 243 candidate
-cases were dropped for this reason. Two consequences: the golden set is biased
-away from stiff parameter combinations, and the Python API should warn rather
-than silently return a non-converged answer where the Fortran only prints to
-stdout and carries on.
+cases were dropped for this reason.
+
+*Half-addressed in Phase 2.* `Solver(on_nonconvergence=...)` surfaces it: the
+default warns and returns the results, `"raise"` refuses them, `"ignore"` is
+available but has to be asked for. The warning says what to try, including that
+raising `nstep` is the wrong instinct here. What remains open is the golden set
+itself, which is still biased away from stiff parameter combinations because the
+reference cannot solve them at any substep count — so the port has no evidence
+about a region of parameter space a calibration could wander into.
 
 ### Summation order will diverge eventually — *low*
 
@@ -522,3 +575,6 @@ twelve before legacy compatibility and LUMPREP came out of scope. Phases 0 and 1
 are the ones not to compress: every later gate is only as trustworthy as the
 oracle built in Phase 0, and that oracle now carries the project's only
 legacy-format code.
+
+Phases 0–2 are complete. `pandas` joins `numpy` as a runtime dependency from
+Phase 2 on; `matplotlib` stays optional, behind `Results.plot()`.
