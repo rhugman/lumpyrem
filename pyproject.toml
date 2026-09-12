@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lumpyrem"
+version = "0.0.1"
+description = "Lumped-parameter recharge modelling, a Python port of LUMPREM"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+# Numba's supported NumPy ceiling is why this is pinned; see docs/conversion-plan.md
+# section 7.  Phase 3 settles whether Numba delivers before the array API is
+# built on top of it.
+fast = ["numba>=0.60", "numpy<2.4"]
+test = ["pytest>=7", "numpy>=1.24"]
+dev = ["pytest>=7", "ruff>=0.6", "numpy>=1.24"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lumpyrem"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests", "src"]
+addopts = "-ra --strict-markers"
+markers = ["oracle: requires gfortran to build the reference implementation"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "NPY"]
+
+[tool.ruff.lint.per-file-ignores]
+# The oracle fixtures mirror the Fortran variable names on purpose, and
+# LUMPREM's pore-size parameter really is called "l".
+"tests/oracle/*" = ["E741"]
