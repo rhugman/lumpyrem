@@ -4,21 +4,32 @@ A Python port of the [LUMPREM](https://pesthomepage.org) lumped-parameter
 recharge model, adding array-based forcing and output, a modern API, and
 compiled-speed execution.
 
-**Status: Phase 0 complete.** The reference oracle and its test scaffolding are
-in place. The model kernel arrives in Phase 1. See
-[docs/conversion-plan.md](docs/conversion-plan.md) for the full plan.
+**Status: Phase 1 complete.** The reference oracle is in place and the model
+kernel reproduces it bit-for-bit. The designed Python API arrives in Phase 2.
+See [docs/conversion-plan.md](docs/conversion-plan.md) for the full plan.
 
-## What Phase 0 provides
+## What is here
+
+`lumpyrem.core` is a faithful scalar port of LUMPREM2's `rechmod` kernel and its
+simulation loop. It reproduces the Fortran **bit-for-bit — 0 ULP on every column
+of all 209 reference cases**, against a gate that allows 10. It takes floats and
+sequences and returns arrays; the designed API is Phase 2's job.
+
+Fidelity is not just asserted. `tests/test_kernel_mutations.py` reintroduces
+each known trap in turn and requires the golden set to reject it, which is what
+found the two demotions and the one real coverage gap recorded in the plan.
+
+## The reference oracle
 
 A regression oracle: the original Fortran, rebuilt from vendored source with a
-widened output writer, driven over 207 frozen cases whose results are committed
+widened output writer, driven over 209 frozen cases whose results are committed
 as golden files. Every later phase is gated on reproducing them.
 
 | | |
 |---|---|
 | `vendor/fortran/` | LUMPREM and LUMPREM2 sources, unmodified |
 | `tests/oracle/` | Build, legacy `.in` writer, case generator, result readers |
-| `tests/data/cases.json.gz` | 207 frozen case specifications |
+| `tests/data/cases.json.gz` | 209 frozen case specifications |
 | `tests/data/golden/` | Reference output for each, full precision, gzipped |
 | `scripts/generate_golden.py` | Rebuilds and refreezes the golden set |
 

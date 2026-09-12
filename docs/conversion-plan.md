@@ -222,7 +222,7 @@ dropped because the reference cannot solve them at any substep count — see
 > ULP budget applies rather than byte-identity; see *Transcendentals are not
 > portable* below. **Met**, byte-identity verified on macOS/arm64.
 
-### Phase 1 — Faithful kernel port (1 week)
+### Phase 1 — Faithful kernel port (1 week) — **complete**
 
 A literal translation of the physics and nothing else. Resist improving anything
 here — the fidelity traps in section 6 are all places where a tidier rewrite
@@ -234,8 +234,20 @@ silently changes answers.
 - Drive it from a plain function signature — parameters and dense daily forcing
   arrays in, result arrays out. No file layer at all at this stage.
 
-> **Gate** — All 200 golden cases agree to <= 10 ULP on every column. The
-> prototype already hits 1–2 ULP on the upper store.
+*As built:* `lumpyrem.core` — `drainage`, `evap`, `rechmod` and the
+`lumprem2.f` simulation loop, ~570 lines of scalar Python. Traps 13 and 14 are
+**reproduced, not repaired**: the Phase 1 gate is bit-fidelity, and both defects
+are in the golden files. A fix belongs above the kernel, as an opt-in, once
+there is an API to put it in.
+
+Coverage is checked rather than asserted. `tests/test_kernel_mutations.py`
+reintroduces each trap in turn and requires the golden set to reject it. That
+survey is what turned up the two demotions below, and it caught a real gap: no
+case exercised trap 5 at all until `empty_store_fixup` was added for it.
+
+> **Gate** — All 209 golden cases agree to <= 10 ULP on every column. **Met, at
+> 0 ULP** — every column of every case is bit-identical, not merely within
+> budget. The budget stays at 10 so that Phase 3's reordering has room.
 
 ### Phase 2 — The Python API (1–2 weeks)
 
@@ -342,17 +354,31 @@ They belong in the porting checklist and, ideally, as named test cases.
    the tolerance level.
 3. **The first iteration never tests convergence.** `if (iter.eq.1) go to 390` —
    a `while` loop that tests up front will exit one iteration early.
-4. **Irrigation adds a second convergence criterion.** When the irrigation code is
-   non-zero, both the volume *and* the irrigation increment must satisfy the
-   tolerance. The irrigation test is relative to the mean of successive
-   estimates, so it behaves differently near zero.
+4. ~~**Irrigation adds a second convergence criterion.**~~ *Demoted in Phase 1
+   — it cannot change results.* When the irrigation code is non-zero, both the
+   volume *and* the irrigation increment must satisfy the tolerance. It does
+   bind: in 48 of the 209 frozen cases it forces extra iterations. But once
+   irrigation fires, `tvol` is pinned to `vvol` from the first iteration
+   onwards, so every later iteration computes the same `vd` and returns
+   bit-identical `rtemp1`, `rtemp2` and `tempvol`. Exiting early gives the same
+   answer. It is an iteration-count detail, not a fidelity risk.
 5. **The store-empties fix-up.** When the store is drawn to exactly zero and
    demand exceeded supply, drainage and evaporation are scaled back in proportion
    so the day's balance still closes. Omitting it is invisible in most runs and
-   destroys the balance column in dry ones.
-6. **Macropore split uses a strict inequality.** `if (rtemp1 < mflowmax * tstep)`
+   destroys the balance column in dry ones. *It is rarer than it looks: across
+   209 randomised and structured cases it never fired productively until a case
+   was built for it. Rain must stay at zero in such a case — an empty store
+   receiving rain under high demand puts the Picard iteration into a two-cycle
+   it never escapes.*
+6. ~~**Macropore split uses a strict inequality.**~~ *Demoted in Phase 1 — the
+   branches are identical at the boundary.* `if (rtemp1 < mflowmax * tstep)`
    sends everything to macropore flow; otherwise the cap goes to macropore and
-   the remainder to runoff. On exact equality the two branches differ.
+   the remainder to runoff. On exact equality the `else` branch adds
+   `mflowmax * tstep` to macropore — the same number — and
+   `rtemp1 - mflowmax * tstep`, which is exactly `0.0`, to runoff. There is no
+   difference to get wrong. Verified by constructing the equality case
+   (`nstep = 4`, `ks = 0.25`, `rain = 0.5`, `mflowmax = 0.25`, all binary-exact)
+   and by mutating `<` to `<=` across the whole golden set.
 7. **Delay buffers split into whole and fractional days.**
    `irdelay = int(rdelay) + 1` and `frdelay = rdelay - int(rdelay)`; each day
    releases `(1 - frdelay)` of the tail element and scales what remains by
@@ -396,6 +422,14 @@ They belong in the porting checklist and, ideally, as named test cases.
     sitting beyond `irdelay` when a call begins — is added to `recharge` but
     never routed into the lower store, and vanishes. The loss is exactly that
     amount, once per affected call. Pinned by `two_store_buffer_claim_lost`.
+
+15. **A single-precision literal sits in a double-precision expression.**
+    *Found in Phase 1.* `lumprem2.f` floors the volume before the elevation
+    conversion with `if (dtemp .lt. 1.0e-10) dtemp = 1.0e-10`. That literal is a
+    default REAL, so the value actually used is `float32(1e-10)` widened —
+    `1.00000001335143196e-10`, not `1e-10`. With a negative `power` the
+    difference reaches 7e-4, which is millions of ULP. A port that writes the
+    constant the obvious way fails the gate.
 
 Traps 13 and 14 are the only two places where the reference's own water balance
 fails to close. Both are reproducible, both are recorded in

@@ -1,5 +1,5 @@
 {
- "n_cases": 207,
+ "n_cases": 209,
  "sha256": {
   "all_macropore": "4a3ac17d65ae31fa56130d3a390ca977647255ff4ebb7feb048a2845c5e0c1ad",
   "buffers_long_prefilled": "b402cd3017045efc7f3224d947d60fcc497466f9d82eb15dcee38154b8417626",
@@ -13,8 +13,10 @@
   "dry_high_epot": "20814ad4391e11b14d714df4b265bd28cd057e7a41aeb91db520670cb9b94bdf",
   "dry_no_rain": "2de984f1e55779f3a49d2897f6b60008ecef5a6c25346c41e00da448e85cf997",
   "elev_clamped_both": "6deaf19f819ccd386a623ff9c4207c57ef2e7616885a0590d26416922d0a642f",
+  "elev_floor_visible": "b3ff80351f78634ff8f4bb3091a6f1933ea9e728c828f76443c48a8a189936ab",
   "elev_fractional_power": "aba68c0424a2e76679f2d0d503af3095eb2f6b2ca3ca95b11587cac433f05596",
   "elev_negative_power": "b6ac2745da39dfb501203fda8c5ec23975a27757149cfe3fa7c17067d750ed61",
+  "empty_store_fixup": "ef61f26f8fdef47fe663f2218761731cde122317c98b07a80b7366e031394965",
   "irrig_always": "3324532722e7f563aa3caa11eb63ac16db4689574d98a8fd832e2eab2b21c4b4",
   "irrig_blocks": "060a63cdb5aa5f517eb5a842736043744f4108b5abfb2968e45bb1616f3e8304",
   "irrig_bypasses_empty_fixup": "94175ed2e7a4478c20b62b1f4cca831b0fdcab93ea01c46bf57cfc5a12983f7a",

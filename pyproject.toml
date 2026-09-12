@@ -39,3 +39,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "NPY"]
 # The oracle fixtures mirror the Fortran variable names on purpose, and
 # LUMPREM's pore-size parameter really is called "l".
 "tests/oracle/*" = ["E741"]
+# core.py is a literal translation held to bit-fidelity. It keeps the Fortran's
+# parameter names and its nested branch structure so the correspondence stays
+# checkable line by line; collapsing the nesting would hide it.
+"src/lumpyrem/core.py" = ["E741", "SIM102"]

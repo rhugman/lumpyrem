@@ -104,6 +104,16 @@ def structured_cases() -> list[Case]:
     add("dry_high_epot", rain=[0.0] * 180, epot=[0.5] * 180, cropfac=[1.4] * 180)
     add("start_full", vol=0.5)
     add("start_empty", vol=0.0)
+    # The fix-up only fires when a substep drives the store to exactly zero
+    # *and* demand exceeded supply -- and no other case in this set does that,
+    # which a mutation test confirmed.  Here evaporative demand far exceeds the
+    # water present, with no rain to refill: the store crosses zero and the
+    # fix-up scales drainage and evaporation back so the day still balances.
+    # Rain must stay at zero -- an empty store receiving rain under high demand
+    # puts the Picard iteration into a two-cycle it never escapes.
+    add("empty_store_fixup", n=60, maxvol=1.0, vol=0.5, irrigvolfrac=0.0,
+        ks=0.05, m=0.5, l=1.0, nstep=1, rain=[0.0] * 60, epot=[2.0] * 60,
+        cropfac=[1.0] * 60, gamma=[4.5] * 60, outdays=[15, 30, 45, 60])
 
     # -- overflow, macropore split and runoff (trap 6)
     add("deluge", rain=[2.0] * 180, mflowmax=0.1)
@@ -140,6 +150,14 @@ def structured_cases() -> list[Case]:
     add("elev_negative_power", power=-0.5, factor2=1.0e-4,
         elevmin=100.0, elevmax=130.0, vol=0.0)
     add("elev_clamped_both", elevmin=15.2, elevmax=15.4)
+    # The floor lumprem2.f applies before the conversion is written `1.0e-10`,
+    # a default REAL literal in a double expression, so the value actually used
+    # is float32(1e-10) widened.  `elev_negative_power` above cannot see that:
+    # its result clamps to elevmin either way.  This case keeps the store at
+    # zero (so the floor always applies) and picks a power gentle enough that
+    # the result lands between the clamps, where the difference is visible.
+    add("elev_floor_visible", vol=0.0, rain=[0.0] * 180, power=-0.05,
+        factor1=0.0, factor2=1.0, offset=15.0)
     add("elev_fractional_power", power=0.35, factor2=2.0)
 
     # -- the lower store (traps 9, 10, 12)
