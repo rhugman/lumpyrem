@@ -150,7 +150,7 @@ Both candidate Python strategies were measured against the Fortran on the same
 | NumPy, vectorised over cells | 100 | 335 | 17x slower | overhead dominates |
 | NumPy, vectorised over cells | 1,000 | 73 | 3.7x slower | still losing |
 | NumPy, vectorised over cells | 10,000 | 45 | 2.2x slower | never catches up |
-| **Numba `njit` + `prange` over cells** | any | — | ~1x x cores | **the plan** — not yet benchmarked |
+| **Numba `njit` + `prange` over cells** | any | — | ~1x x cores | **the plan** — *measured in Phase 3, below* |
 
 NumPy amortises its overhead only as cell count grows, and even at 10,000 cells
 it stays twice as slow as one core of Fortran. Numba is the right tool here
@@ -159,10 +159,14 @@ written — preserving the Picard iteration exactly — and `prange` then
 parallelises across cells, which *are* independent. That should land at Fortran
 speed per core, multiplied by core count.
 
-> **Not yet benchmarked.** Numba could not be run in this environment: it
-> requires NumPy <= 2.3 and 2.4 is installed. Proving the Numba number is the
-> first task of Phase 3, and the plan should not be considered de-risked until
-> it is.
+> **Benchmarked at the start of Phase 3 — it holds.** On the same ten-year,
+> five-substep workload, the compiled kernel runs at **0.94–0.97x the time of
+> `rechmod2.f`** per cell on one core (M4 Max, gfortran `-O2`), returns a
+> checksum identical to the Fortran's, and reaches **~10x on the 12
+> performance cores**. The 20 ms figure above is the whole executable
+> including file I/O; `scripts/benchmark_numba.py` calls `rechmod` from a small
+> Fortran harness instead, which puts the reference at 5.2 ms (one store) and
+> 9.7 ms (two stores), and times Numba against that.
 
 ---
 
@@ -302,7 +306,7 @@ Three decisions worth recording:
 > driven from genuinely *sparse* forcing files, which the dense Phase 0 cases
 > were designed never to produce, and the Python rules reproduce it exactly.
 
-### Phase 3 — Array-based and compiled (2–3 weeks)
+### Phase 3 — Array-based and compiled (2–3 weeks) — **in progress**
 
 The main extension, and the one with real engineering risk. Start by
 benchmarking Numba, because the whole design rests on it.
@@ -327,6 +331,38 @@ benchmarking Numba, because the whole design rests on it.
 > **Gate** — An *N*-cell run with identical parameters matches *N* single runs
 > exactly; per-cell time <= Fortran; scaling is near-linear to physical core
 > count.
+
+*As built so far:* the Numba benchmark, which the plan put first because
+everything else rests on it. `lumpyrem.compiled` is the `core` arithmetic
+rewritten into the shape Numba accepts — no dataclasses, no `for`-`else`,
+parameters packed into one float64 row per cell — with `simulate()` as a
+drop-in for `core.simulate()` and `simulate_cells()` running cells under
+`prange`. `core` stays as the readable translation and the fallback.
+
+- **Phase 1 gate, unchanged: met at 0 ULP.** All 209 golden cases are
+  bit-identical, and `compiled` is required to equal `core` exactly — values,
+  output days and non-convergence counts. LLVM keeps the expression order and
+  does not contract to FMAs without `fastmath`, so the port survived
+  compilation untouched. `error_model="numpy"` lets a zero divisor produce
+  inf/nan as the Fortran does instead of raising, and changes nothing for
+  finite inputs.
+- **Correctness half of this gate: met.** An *N*-cell run reproduces *N*
+  single runs bit for bit, both for identical cells and for 31 golden cases
+  sharing one schedule; a cell-order slip is caught by 30 of the 31.
+- **Per-cell time <= Fortran: met.** 0.97x (one store) and 0.94x (two
+  stores), timed in alternating rounds against the harness.
+- **Near-linear scaling: provisionally met.** 2048 cells: 3.8x on 4 threads,
+  7.4x on 8, 10.2x on 12 (85% efficiency), 11.7x on 16, where the four
+  efficiency cores join. *Measured with the machine at a load average of
+  ~65 from other work* — the Fortran/Numba ratio is protected by alternating
+  the two, but absolute times and scaling are not, and should be re-measured
+  on a quiet machine before being quoted. Cells with a ±20% parameter spread
+  vary in cost, and `prange`'s static chunking loses a few percent to that.
+
+Not started: ring buffers sized to the delay, `ModelGrid`, xarray results, and
+mutation coverage of `compiled` (`test_kernel_mutations.py` still only mutates
+`core`, so `compiled` is held by the golden set and by equality with `core`,
+not by its own mutation survey).
 
 ### Phase 4 — MODFLOW and PEST coupling (1 week)
 
@@ -488,13 +524,15 @@ scoped around them rather than waived.
 
 ## 7. Risks and open questions
 
-### Numba is unproven here — *open*
+### Numba is unproven here — *closed*
 
-It is the load-bearing assumption of Phase 3 and could not be benchmarked: the
-installed NumPy 2.4 exceeds Numba's supported ceiling of 2.3. Pin `numpy<2.4` in
-the dev environment and settle this in the first days of Phase 3, before the
-array API is built on top of it. If Numba disappoints, the fallbacks are Cython
-or a small Rust extension, both of which cost more build complexity.
+It was the load-bearing assumption of Phase 3. *Settled in Phase 3's first
+step:* with `numpy<2.4` pinned by the `fast` extra, the compiled kernel is
+bit-identical to the reference, at or slightly under Fortran time per cell, and
+scales to ~10x on 12 cores; see the Phase 3 notes. Cython and Rust are no
+longer needed as fallbacks. What remains is the pin itself: `fast` holds NumPy
+at 2.3 until Numba supports 2.4, and CI installs it so the compiled kernel is
+gated on all three platforms rather than skipped.
 
 ### The oracle fixture is now the only legacy-format code — *mitigated*
 
@@ -576,5 +614,6 @@ are the ones not to compress: every later gate is only as trustworthy as the
 oracle built in Phase 0, and that oracle now carries the project's only
 legacy-format code.
 
-Phases 0–2 are complete. `pandas` joins `numpy` as a runtime dependency from
-Phase 2 on; `matplotlib` stays optional, behind `Results.plot()`.
+Phases 0–2 are complete, and Phase 3 is under way with its main risk retired.
+`pandas` joins `numpy` as a runtime dependency from Phase 2 on; `matplotlib`
+stays optional, behind `Results.plot()`, and `numba` behind the `fast` extra.

@@ -4,10 +4,12 @@ A Python port of the [LUMPREM](https://pesthomepage.org) lumped-parameter
 recharge model, adding array-based forcing and output, a modern API, and
 compiled-speed execution.
 
-**Status: Phase 2 complete.** The reference oracle is in place, the model
+**Status: Phase 3 in progress.** The reference oracle is in place, the model
 kernel reproduces it bit-for-bit, and the Python API is built on top — real
-dates, typed parameters, explicit resampling. Array-based and compiled
-execution arrive in Phase 3. See
+dates, typed parameters, explicit resampling. A Numba build of the kernel is
+bit-identical too, matches Fortran speed per cell and scales across cores
+(`pip install -e ".[fast]"`, `scripts/benchmark_numba.py`); the array API
+that uses it comes next. See
 [docs/conversion-plan.md](docs/conversion-plan.md) for the full plan.
 
 ## Using it
