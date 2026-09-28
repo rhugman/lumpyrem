@@ -110,11 +110,13 @@ Apple's libm, mingw — whose last bit differs. Everything else in the kernel is
 `+ - * /`, which IEEE 754 pins exactly. So the tests measure, on each machine,
 whether Python and the Fortran share `exp` and `**`:
 
-- **where they do** (macOS and Linux so far), the port is held to ≤ 10 ULP
-  against the Fortran built on that machine, and reproduces it bit for bit;
+- **where they do** — macOS, Linux and Windows (UCRT64) in CI — the port is
+  held to ≤ 10 ULP against the Fortran built on that machine, and reproduces it
+  bit for bit on all three;
 - **where they do not**, and for the committed goldens off the platform that
   made them, the check is a difference relative to the size of what each
-  column is computed from, `LUMPYREM_CROSS_RTOL` (provisionally `1e-9`).
+  column is computed from, `LUMPYREM_CROSS_RTOL` = `1e-9`. The measured worst
+  case is 7.7e-11, Windows against the macOS goldens.
 
 `scripts/crossplatform_report.py` prints the full comparison for the machine
 it runs on; CI runs it on all three platforms.

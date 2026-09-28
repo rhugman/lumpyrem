@@ -8,9 +8,9 @@ first CI run measured what that means (docs/conversion-plan.md, section 7):
 - Where the Python process and the Fortran reference call the *same* ``exp``
   and ``pow`` -- macOS, Linux -- the port reproduces a Fortran build on the
   same machine bit for bit.  That is the claim, and it stays exact.
-- Where they do not -- the committed goldens off macOS, and Windows, where
-  CPython uses the UCRT and mingw gfortran its own libm -- the two agree to
-  within rounding, which ULP cannot express: a residual such as ``balance``
+- Where they do not -- the committed goldens off macOS, and Windows under
+  MINGW64, where CPython used the UCRT and gfortran mingw's own libm -- the
+  two agree to within rounding, which ULP cannot express: a residual such as ``balance``
   sits at ~1e-15 and flips sign under a last-bit change, which is 1e18 ULP and
   physically nothing.  There the check is a difference relative to the scale
   of what each column is computed from (``SCALE_FROM``).
@@ -35,8 +35,11 @@ from ulp import ulp_diff
 #: docs/conversion-plan.md, Phase 1 gate: exact regime.
 ULP_BUDGET = 10
 
-#: Tolerance regime: |a - b| <= CROSS_RTOL * scale.  Provisional; see the
-#: cross-platform report in CI for the measured worst case.
+#: Tolerance regime: |a - b| <= CROSS_RTOL * scale.  Measured in CI by
+#: scripts/crossplatform_report.py: the worst case is 7.7e-11, Windows against
+#: the macOS goldens in vol_lower (Linux: 1.3e-12).  1e-9 leaves ~13x for maths
+#: library versions to drift; tightening it would buy nothing, since every
+#: platform CI runs is in the exact regime against its own Fortran.
 CROSS_RTOL = float(os.environ.get("LUMPYREM_CROSS_RTOL", "1e-9"))
 
 #: The scale a column's disagreement is measured against: the largest |value|

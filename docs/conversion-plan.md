@@ -556,7 +556,7 @@ deliberately hits the iteration limit — which doubles as the sharpest availabl
 test of traps 2 and 3, since the reference then exits carrying whatever iterate
 it holds.
 
-### Transcendentals are not portable across platforms — *measured*
+### Transcendentals are not portable across platforms — *closed*
 
 The Phase 0 gate originally read "regenerates reproducibly on all three
 platforms". That is achievable for `+ - * /`, which IEEE 754 pins exactly and
@@ -597,10 +597,17 @@ physical effect is rejected, across all 104 cases the teeth test could pick.
 
 The mutation survey compares each mutation against a fresh build of the
 unmutated kernel rather than against goldens, so it asks only whether the
-mutation changes this platform's arithmetic. Windows now builds with UCRT64,
-which links the C runtime CPython uses; the probe will show whether that
-closes the Windows gap. `rtol` is `1e-9` and provisional until the report has
-measured the worst case under the per-column scale.
+mutation changes this platform's arithmetic.
+
+*Closed by the second run.* Moving Windows from MINGW64 to UCRT64, which links
+the C runtime CPython uses, closed the Windows gap: the probe finds `exp` and
+`**` bit-identical on all three platforms, and the Python kernel reproduces
+the Fortran built on the same runner 209/209 on each. **Every platform is now
+in the exact regime.** The tolerance is left with one job, the committed
+goldens off macOS, where the measured worst case under the per-column scale is
+7.7e-11 (Windows, `vol_lower`; Linux 1.3e-12) and the largest absolute
+difference 2.3e-13 m. `rtol` stays at `1e-9`, now as a measurement with ~13x
+headroom rather than a guess.
 
 ### Stiff configurations have no reference — *watch, new*
 
