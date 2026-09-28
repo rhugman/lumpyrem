@@ -1,9 +1,10 @@
 """Phase 3 gate, correctness half: the Numba build of the kernel.
 
 ``lumpyrem.compiled`` is the same arithmetic as ``lumpyrem.core`` in a form
-Numba can compile.  It is held to the Phase 1 budget against the golden files,
-to exact equality with ``core`` itself, and -- the part of the Phase 3 gate
-that is about arrays -- an N-cell run must reproduce N single runs exactly.
+Numba can compile.  It is held to the Phase 1 gate against the Fortran
+reference (tests/reference.py), to exact equality with ``core`` itself, and
+-- the part of the Phase 3 gate that is about arrays -- an N-cell run must
+reproduce N single runs exactly.
 
 The speed half of the gate is measured by ``scripts/benchmark_numba.py``
 rather than asserted here: timings on shared CI runners are too noisy to gate
@@ -15,33 +16,29 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from kernel_compare import golden_values, run_case_through
-from ulp import ulp_diff
+from kernel_compare import run_case_through
 
 compiled = pytest.importorskip("lumpyrem.compiled", reason="numba not installed")
 
 from lumpyrem import core  # noqa: E402
 from lumpyrem.core import COLUMNS  # noqa: E402
 
-#: docs/conversion-plan.md, Phase 1 gate, applied unchanged.
-ULP_BUDGET = 10
 
-
-def test_compiled_reproduces_every_golden_case(frozen_cases, rundir):
+def test_compiled_reproduces_every_golden_case(frozen_cases, reference, agreement):
+    """The Phase 1 gate, applied unchanged to the compiled build."""
     worst, worst_at, exact = 0.0, None, 0
     for case in frozen_cases:
-        want = golden_values(case.name, rundir / f"c_{case.name}.csv")
+        want = reference[case.name]
         got = run_case_through(compiled.simulate, case)
         assert got.shape == want.shape, case.name
-        diffs = ulp_diff(got, want)
-        peak = float(diffs.max())
+        peak, col = agreement.worst(got, want)
         exact += peak == 0.0
         if peak > worst:
-            _, col = np.unravel_index(int(diffs.argmax()), diffs.shape)
             worst, worst_at = peak, f"{case.name}:{COLUMNS[col]}"
-    print(f"\n{exact}/{len(frozen_cases)} cases bit-identical; worst {worst:.0f} ULP"
-          + (f" at {worst_at}" if worst_at else ""))
-    assert worst <= ULP_BUDGET, f"worst {worst:.0f} ULP at {worst_at}"
+    print(f"\n{agreement.describe()}\n{exact}/{len(frozen_cases)} cases exact; "
+          f"worst {worst:.3g} {agreement.unit()}" + (f" at {worst_at}" if worst_at else ""))
+    assert worst <= agreement.budget(), (
+        f"worst {worst:.3g} {agreement.unit()} at {worst_at}; {agreement.describe()}")
 
 
 def test_compiled_matches_core_exactly(frozen_cases):

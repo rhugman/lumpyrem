@@ -23,18 +23,21 @@ jobs:
           python-version: ${{ matrix.python }}
 
       # gfortran is preinstalled on the Ubuntu runner and, as gfortran-NN, on
-      # the macOS one; Windows needs it from the MSYS2/mingw toolchain.
+      # the macOS one; Windows needs it from MSYS2.  UCRT64 rather than the
+      # deprecated MINGW64: it links the same C runtime CPython does, which is
+      # the best chance of Python and the Fortran sharing exp and **.  The
+      # maths probe in tests/reference.py decides whether they actually do.
       - name: Install gfortran (Windows)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
-          install: mingw-w64-x86_64-gcc-fortran
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc-fortran
           path-type: inherit
 
       - name: Add mingw to PATH (Windows)
         if: runner.os == 'Windows'
-        run: echo "D:/a/_temp/msys64/mingw64/bin" >> $env:GITHUB_PATH
+        run: echo "D:/a/_temp/msys64/ucrt64/bin" >> $env:GITHUB_PATH
 
       # The macOS image carries Homebrew GCC only as gfortran-NN; there is no
       # plain gfortran on the PATH.  Link the newest one, installing GCC if the
@@ -78,8 +81,9 @@ jobs:
       - name: Test
         run: pytest -q
 
-      # The Phase 0 gate: golden files must come back identical from a clean
-      # checkout.  Byte-identity is required on the platform that generated
-      # them; elsewhere the ULP budget in tests/test_golden.py applies.
+      # The Phase 0 gate: golden files must come back byte-identical from a
+      # clean checkout, which only the platform that generated them can do.
+      # Elsewhere tests/test_golden.py holds them to the tolerance regime.
       - name: Regenerate golden files
+        if: runner.os == 'macOS'
         run: python scripts/generate_golden.py --check

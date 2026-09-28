@@ -4,6 +4,13 @@ A gate that passes is only meaningful if it would fail when something breaks.
 Each mutation below deliberately reintroduces one of the mistakes the plan
 warns about; the golden set must reject it.
 
+"Reject" is measured against a fresh build of the *unmutated* kernel on the
+same machine, not against the golden files.  A mutation changes the kernel's
+arithmetic, and whether it does is a question about this platform's maths
+library alone -- comparing with numbers produced under a different one would
+count its rounding as the mutation's.  That the unmutated kernel matches the
+reference is the Phase 1 gate's job, and is re-checked here as a guard.
+
 Two entries are marked as provably inert.  Those are not gaps in the test set
 -- they are traps that turn out not to be traps, and the proof is recorded with
 them so nobody re-adds the worry later.
@@ -16,9 +23,10 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pytest
 
-from kernel_compare import golden_values, run_case_through
+from kernel_compare import run_case_through
 from ulp import ulp_diff
 
 KERNEL_SOURCE = Path(__file__).resolve().parents[1] / "src" / "lumpyrem" / "core.py"
@@ -116,10 +124,10 @@ def _build(mutation: Mutation | None, tmp_path: Path):
     return module
 
 
-def _worst_ulp(simulate, cases, rundir) -> float:
+def _worst_ulp(simulate, cases, baseline: dict) -> float:
     worst = 0.0
     for case in cases:
-        want = golden_values(case.name, rundir / f"m_{case.name}.csv")
+        want = baseline[case.name]
         try:
             got = run_case_through(simulate, case)
         except Exception:
@@ -130,10 +138,17 @@ def _worst_ulp(simulate, cases, rundir) -> float:
     return worst
 
 
+@pytest.fixture(scope="module")
+def pristine(frozen_cases, tmp_path_factory) -> dict:
+    """The unmutated kernel's output, built through the same harness."""
+    module = _build(None, tmp_path_factory.mktemp("pristine"))
+    return {case.name: run_case_through(module.simulate, case) for case in frozen_cases}
+
+
 @pytest.mark.parametrize("mutation", MUTATIONS, ids=[m.trap for m in MUTATIONS])
-def test_golden_set_rejects_each_mutation(mutation, frozen_cases, rundir, tmp_path):
+def test_golden_set_rejects_each_mutation(mutation, frozen_cases, pristine, tmp_path):
     module = _build(mutation, tmp_path)
-    worst = _worst_ulp(module.simulate, frozen_cases, rundir)
+    worst = _worst_ulp(module.simulate, frozen_cases, pristine)
 
     if mutation.inert:
         assert worst == 0.0, (
@@ -150,7 +165,13 @@ def test_golden_set_rejects_each_mutation(mutation, frozen_cases, rundir, tmp_pa
     )
 
 
-def test_unmutated_kernel_is_the_one_under_test(frozen_cases, rundir, tmp_path):
-    """Guard the harness: a fresh build of the real kernel must still be exact."""
-    module = _build(None, tmp_path)
-    assert _worst_ulp(module.simulate, frozen_cases[:30], rundir) == 0.0
+def test_unmutated_kernel_is_the_one_under_test(frozen_cases, pristine, reference,
+                                                agreement):
+    """Guard the harness: a fresh build of the real kernel is the real kernel,
+    and it passes the Phase 1 gate."""
+    from lumpyrem.core import simulate
+    for case in frozen_cases[:30]:
+        assert np.array_equal(pristine[case.name], run_case_through(simulate, case)), (
+            case.name)
+        assert agreement.accepts(pristine[case.name], reference[case.name]), (
+            f"{case.name}: {agreement.describe()}")

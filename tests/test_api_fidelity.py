@@ -4,8 +4,11 @@ Phase 1 proved the kernel bit-identical to the Fortran.  Everything Phase 2
 adds sits *above* that kernel, so the only way it can move a number is by
 handing the kernel something subtly different -- a NumPy scalar where the
 kernel expected a Python float, a forcing array rebuilt through a resampler
-that should have been a no-op, an output day off by one.  This test refuses
-all of that: exact equality, not a budget.
+that should have been a no-op, an output day off by one.  Against the kernel
+itself that is refused outright: exact equality, not a budget, on every
+platform.  Against the Fortran reference the rule in tests/reference.py
+applies -- exact where the maths libraries agree, a tolerance where they do
+not.
 """
 
 from __future__ import annotations
@@ -17,31 +20,31 @@ import pandas as pd
 import pytest
 
 from api_compare import EPOCH, dates_for, forcing_for, model_for, run_case_through_api
-from kernel_compare import golden_values, run_case_through
+from kernel_compare import run_case_through
 from lumpyrem import Forcing
 from lumpyrem.core import simulate
 from lumpyrem.results import COLUMNS
 from ulp import ulp_diff
 
 
-def test_api_reproduces_every_golden_case(frozen_cases, rundir):
-    """The gate.  Object API vs the frozen Fortran output, bit for bit."""
+def test_api_reproduces_every_golden_case(frozen_cases, reference, agreement):
+    """The gate.  Object API vs the Fortran reference, bit for bit where the
+    maths libraries allow it."""
     worst, worst_at = 0.0, None
     for case in frozen_cases:
-        want = golden_values(case.name, rundir / f"a_{case.name}.csv")
+        want = reference[case.name]
         got = run_case_through_api(case).values
         assert got.shape == want.shape, (
             f"{case.name}: API produced {got.shape}, reference is {want.shape}"
         )
-        diffs = ulp_diff(got, want)
-        peak = float(diffs.max())
+        peak, col = agreement.worst(got, want)
         if peak > worst:
-            _, col = np.unravel_index(int(diffs.argmax()), diffs.shape)
             worst, worst_at = peak, f"{case.name}:{COLUMNS[col]}"
 
-    assert worst == 0.0, (
-        f"the object API moved a number: worst {worst:.0f} ULP at {worst_at}. "
-        f"Phase 2 adds no arithmetic, so any difference is a marshalling bug."
+    assert worst <= agreement.budget(ulp_budget=0), (
+        f"the object API moved a number: worst {worst:.3g} {agreement.unit()} at "
+        f"{worst_at}; {agreement.describe()}. Phase 2 adds no arithmetic, so any "
+        f"difference beyond the maths library's is a marshalling bug."
     )
 
 
@@ -125,7 +128,9 @@ def _perturbations(case):
     The failure modes available to a marshalling layer are mis-mapped
     parameters, a shifted output schedule and a forcing series plumbed to the
     wrong variable -- so each is committed deliberately here, and the golden
-    comparison has to reject all of them.
+    comparison has to reject all of them -- under whichever regime this
+    platform runs, since a tolerance loose enough to let one through would be
+    a gate without teeth.
     """
     model = model_for(case)
     forcing = forcing_for(case)
@@ -148,18 +153,18 @@ def _perturbations(case):
            case.outdays)
 
 
-def test_the_gate_rejects_a_mis_marshalled_run(frozen_cases, rundir):
+def test_the_gate_rejects_a_mis_marshalled_run(frozen_cases, reference, agreement):
     """Every deliberate slip below must be caught by the same comparison."""
     case = next(c for c in frozen_cases
                 if not c.two_store and not c.allow_nonconvergence
                 and c.rdelay != c.mdelay and c.m != c.l
                 and any(v != 1.0 for v in c.cropfac) and c.outdays[0] > 1)
-    want = golden_values(case.name, rundir / f"teeth_{case.name}.csv")
+    want = reference[case.name]
     for label, model, forcing, times in _perturbations(case):
         got = model.run(forcing, times=times).values
-        assert got.shape != want.shape or ulp_diff(got, want).max() > 0.0, (
-            f"{case.name}: the gate did not notice {label!r}"
+        assert not agreement.accepts(got, want, ulp_budget=0), (
+            f"{case.name}: the gate did not notice {label!r}; {agreement.describe()}"
         )
     # And the same run, correctly marshalled, still passes -- so the rejections
     # above are the perturbations and not the fixture.
-    assert ulp_diff(run_case_through_api(case).values, want).max() == 0.0
+    assert agreement.accepts(run_case_through_api(case).values, want, ulp_budget=0)

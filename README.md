@@ -105,12 +105,19 @@ The Fortran is compiled with `-ffp-contract=off`, so the compiler cannot fuse
 Golden files then reproduce **byte-for-byte** on the platform that generated
 them.
 
-Across platforms a small ULP budget applies, because `exp` and `**` come from
-the system maths library and the last bit of a transcendental is not
-standardised between glibc, Apple's libm and mingw. Everything else in the
-kernel is `+ - * /`, which IEEE 754 pins exactly. The budget is
-`LUMPYREM_GOLDEN_ULP`, currently 16 and provisional until CI has measured the
-real figure on all three platforms.
+Across platforms `exp` and `**` come from different maths libraries — glibc,
+Apple's libm, mingw — whose last bit differs. Everything else in the kernel is
+`+ - * /`, which IEEE 754 pins exactly. So the tests measure, on each machine,
+whether Python and the Fortran share `exp` and `**`:
+
+- **where they do** (macOS and Linux so far), the port is held to ≤ 10 ULP
+  against the Fortran built on that machine, and reproduces it bit for bit;
+- **where they do not**, and for the committed goldens off the platform that
+  made them, the check is a difference relative to the size of what each
+  column is computed from, `LUMPYREM_CROSS_RTOL` (provisionally `1e-9`).
+
+`scripts/crossplatform_report.py` prints the full comparison for the machine
+it runs on; CI runs it on all three platforms.
 
 ## Two defects in the reference
 

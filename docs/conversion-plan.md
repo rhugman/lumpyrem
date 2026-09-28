@@ -223,8 +223,9 @@ dropped because the reference cannot solve them at any substep count — see
 
 > **Gate** — Golden files regenerate **byte-for-byte** on the platform that
 > generated them, from a clean checkout and a fresh compile. Across platforms a
-> ULP budget applies rather than byte-identity; see *Transcendentals are not
-> portable* below. **Met**, byte-identity verified on macOS/arm64.
+> tolerance applies rather than byte-identity; see *Transcendentals are not
+> portable* below. **Met**, byte-identity verified on macOS/arm64, locally and
+> on the CI runner.
 
 ### Phase 1 — Faithful kernel port (1 week) — **complete**
 
@@ -555,17 +556,51 @@ deliberately hits the iteration limit — which doubles as the sharpest availabl
 test of traps 2 and 3, since the reference then exits carrying whatever iterate
 it holds.
 
-### Transcendentals are not portable across platforms — *open, new*
+### Transcendentals are not portable across platforms — *measured*
 
 The Phase 0 gate originally read "regenerates reproducibly on all three
 platforms". That is achievable for `+ - * /`, which IEEE 754 pins exactly and
 which `-ffp-contract=off` keeps the compiler from fusing into FMAs. It is *not*
 achievable for `exp` and `**`, which the kernel uses in both `drainage` and
 `evap` and which come from the system maths library — glibc, Apple's libm and
-mingw do not agree on the last bit. So the gate is byte-identity on the
-generating platform and a ULP budget elsewhere. The budget is currently 16 and
-provisional: nothing has yet measured the real cross-platform figure, and the
-first CI run on Linux and Windows should replace the guess with the measurement.
+mingw do not agree on the last bit.
+
+The first CI run measured what that means, with
+`scripts/crossplatform_report.py` comparing, on each runner, the committed
+goldens, the Fortran rebuilt there, the Python kernel and the compiled one:
+
+- **The port is exact wherever it shares a maths library with the
+  reference.** On Linux the Python kernel reproduces the locally built Fortran
+  209/209 bit for bit, as it does on macOS; the compiled kernel reproduces the
+  Python one 209/209 on all three platforms.
+- **Across maths libraries the disagreement is rounding, and ULP cannot say
+  so.** Linux against the macOS goldens: 141/209 cases identical, largest
+  absolute difference 2.3e-13 m of elevation. But the guessed 16-ULP budget
+  failed at 8.8e18 ULP, because `balance` and other residuals sit near 1e-15
+  and flip sign under a last-bit change — a huge ULP count for physically
+  nothing.
+- **Windows was the surprise.** CPython there uses the UCRT's `exp` and `pow`
+  and MINGW64 gfortran its own, so the port and the reference disagreed on the
+  *same machine*: 139/209 identical, worst 7.5e-11 relative to the column.
+
+So the rule is now measured, not guessed (`tests/reference.py`). A probe
+evaluates `exp` and `**` in Fortran and in Python over the kernel's argument
+ranges and compares the bits. Where they match, the port is held to the Phase
+1 budget against the Fortran built on the same machine — not against goldens
+from another platform. Where they do not, and for the goldens off macOS, the
+check is `|a - b| <= rtol x scale`, with each column's scale the size of what it
+is computed from: `balance` against the fluxes it closes, `del_vol_*` against
+the volume it changes. One case-wide scale was tried first and rejected: it let
+swapped delays through, because a small flux could hide behind a large volume.
+Under the per-column scale every deliberate marshalling slip that has any
+physical effect is rejected, across all 104 cases the teeth test could pick.
+
+The mutation survey compares each mutation against a fresh build of the
+unmutated kernel rather than against goldens, so it asks only whether the
+mutation changes this platform's arithmetic. Windows now builds with UCRT64,
+which links the C runtime CPython uses; the probe will show whether that
+closes the Windows gap. `rtol` is `1e-9` and provisional until the report has
+measured the worst case under the per-column scale.
 
 ### Stiff configurations have no reference — *watch, new*
 

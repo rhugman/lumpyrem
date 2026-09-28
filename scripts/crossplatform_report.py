@@ -11,9 +11,12 @@ case it produces four outputs --
     C  lumpyrem.compiled, run here (if Numba is installed)
 
 -- and reports, per comparison and per column, how far apart they are: in ULP,
-absolutely, and relative to the size of that column in that case.  The last
-one matters because a residual such as ``balance`` sits at ~1e-17 and flips
-sign under a last-bit change, which is 1e18 ULP and physically nothing.
+absolutely, and relative to the case's scale -- the measure the tolerance
+regime of tests/reference.py gates on, so the worst figure here is the one
+``CROSS_RTOL`` is set from.  ULP alone misleads: a residual such as ``balance``
+sits at ~1e-15 and flips sign under a last-bit change, which is 1e18 ULP and
+physically nothing.  It also runs the maths probe that decides which regime
+applies.
 
     python scripts/crossplatform_report.py [--json report.json]
 
@@ -40,6 +43,7 @@ from lumpyrem import core  # noqa: E402
 from oracle.build import build, gfortran  # noqa: E402
 from oracle.infile import load_cases  # noqa: E402
 from oracle.runner import run_case  # noqa: E402
+from reference import CROSS_RTOL, probe_maths, scaled_diff  # noqa: E402
 from ulp import ulp_diff  # noqa: E402
 
 try:
@@ -56,17 +60,11 @@ COMPARISONS = (
 BUDGET = 16
 
 
-def _scale(values: np.ndarray) -> np.ndarray:
-    """Per-column magnitude of each case: the largest |value| it takes."""
-    return np.maximum(np.abs(values).max(axis=0), np.finfo(float).tiny)
-
-
 def compare(a: np.ndarray, b: np.ndarray) -> dict:
     ulp = ulp_diff(a, b)
     absd = np.abs(a - b)
     absd[np.isnan(a) & np.isnan(b)] = 0.0
-    rel = absd / _scale(b)
-    return dict(ulp=ulp, abs=absd, rel=rel)
+    return dict(ulp=ulp, abs=absd, rel=scaled_diff(a, b))
 
 
 def main() -> None:
@@ -80,6 +78,7 @@ def main() -> None:
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
+        same_maths, probe_detail = probe_maths(gfortran(), tmp / "probe")
         exe = build(tmp / "build", version=2)
         for case in cases:
             out = {
@@ -118,21 +117,27 @@ def main() -> None:
         f"numpy {np.__version__}, compiler `{gfortran()}`, "
         f"compiled kernel {'on' if compiled else 'off'}",
         "",
+        f"**Maths probe:** {probe_detail} -> "
+        f"{'exact' if same_maths else 'tolerance'} regime for the port against "
+        f"local Fortran.  Tolerance in force: {CROSS_RTOL:g} of case scale.",
+        "",
     ]
     for name, what, *_ in COMPARISONS:
         s = stats[name]
         if not s["cases"]:
             continue
         lines += [f"### {name}: {what}", "",
-                  f"{s['exact']}/{s['cases']} cases bit-identical.", ""]
+                  f"{s['exact']}/{s['cases']} cases bit-identical; worst "
+                  f"{max((v['rel'] for v in s['cols'].values()), default=0.0):.3g} "
+                  f"of case scale.", ""]
         differing = {k: v for k, v in s["cols"].items() if v["ulp"] > 0}
         if differing:
-            lines += ["| column | max ULP | cells > 16 ULP | max abs | max rel to column |",
+            lines += ["| column | max ULP | cells > 16 ULP | max abs | max x case scale |",
                       "|---|---:|---:|---:|---:|"]
             for col, v in sorted(differing.items(), key=lambda kv: -kv[1]["rel"]):
                 lines.append(f"| {col} | {v['ulp']:.3g} | {v['over']}/{v['cells']} | "
                              f"{v['abs']:.3g} | {v['rel']:.3g} |")
-            lines += ["", "Worst cases, relative to column magnitude:", ""]
+            lines += ["", "Worst cases, relative to case scale:", ""]
             for rel, cname, col, row, a, b in sorted(worst_rows[name], reverse=True)[:5]:
                 lines.append(f"- `{cname}` `{col}` row {row}: {a!r} vs {b!r} "
                              f"(rel {rel:.3g})")
@@ -146,7 +151,8 @@ def main() -> None:
             fh.write(text + "\n")
     if args.json:
         args.json.write_text(json.dumps(
-            {"platform": platform.platform(), "stats": stats}, indent=1))
+            {"platform": platform.platform(), "same_maths": same_maths,
+             "probe": probe_detail, "stats": stats}, indent=1))
 
 
 if __name__ == "__main__":

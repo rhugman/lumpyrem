@@ -20,7 +20,6 @@ from lumpyrem import Fill, Forcing, ForcingError
 from lumpyrem.forcing import FORTRAN_FILL, VARIABLES
 from oracle.results import read_csv_output
 from oracle.runner import run_case
-from ulp import ulp_diff
 
 DAY = pd.Timedelta(days=1)
 
@@ -229,12 +228,18 @@ def _sparse_days(n: int, stride: int, first: int = 1) -> list[int]:
 
 
 @pytest.mark.oracle
-def test_fill_rules_match_the_reference_on_sparse_forcing(oracle_exe, frozen_cases, rundir):
+def test_fill_rules_match_the_reference_on_sparse_forcing(oracle_exe, frozen_cases, rundir,
+                                                          agreement):
     """Drive the Fortran from genuinely sparse files and reproduce it exactly.
 
     This is the test dense forcing was designed to make impossible during the
     fidelity gates, and the only one that checks the fill rules against the
     implementation they were copied from rather than against a reading of it.
+
+    Exactly means 0 ULP where Python and the Fortran share a maths library.
+    Where they do not, the tolerance regime still catches any fill rule that
+    lands on the wrong day or the wrong value, but not trap 16's last-bit
+    reciprocal -- that is left to the platforms that can see it.
     """
     case = next(c for c in frozen_cases
                 if not c.two_store and not c.allow_nonconvergence
@@ -286,9 +291,10 @@ def test_fill_rules_match_the_reference_on_sparse_forcing(oracle_exe, frozen_cas
                               times=case.outdays).values
 
     assert got.shape == want.shape
-    worst = float(ulp_diff(got, want).max())
-    assert worst == 0.0, (
-        f"{case.name} under sparse forcing: worst {worst:.0f} ULP. The Python "
-        f"fill rules and the Fortran's have diverged."
+    worst, _ = agreement.worst(got, want)
+    assert worst <= agreement.budget(ulp_budget=0), (
+        f"{case.name} under sparse forcing: worst {worst:.3g} {agreement.unit()}; "
+        f"{agreement.describe()}. The Python fill rules and the Fortran's have "
+        f"diverged."
     )
     assert "itn limit exceeded" not in run.stdout

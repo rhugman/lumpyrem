@@ -1,45 +1,38 @@
 """Phase 1 gate: the Python kernel must reproduce the Fortran reference.
 
-The plan sets the budget at <= 10 ULP on every column of every golden case.
-The port currently achieves bit-identity, so the test asserts the budget and
-reports the margin -- a regression from 0 to 3 ULP would still pass the gate
-but is worth seeing in the log.
+The reference is the Fortran built on the machine running the tests.  Where
+the two share a maths library the plan's budget applies -- <= 10 ULP on every
+column of every case -- and the port achieves bit-identity, so the margin is
+reported: a regression from 0 to 3 ULP would still pass but is worth seeing.
+Where they do not, the tolerance in tests/reference.py applies instead.
 """
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 
-from kernel_compare import golden_values, run_case_through
+from kernel_compare import run_case_through
 from lumpyrem.core import COLUMNS, simulate
-from ulp import ulp_diff
-
-#: docs/conversion-plan.md, Phase 1 gate.
-ULP_BUDGET = 10
 
 
-def test_kernel_reproduces_every_golden_case(frozen_cases, rundir):
-    worst, worst_at = 0.0, None
-    exact = 0
+def test_kernel_reproduces_every_golden_case(frozen_cases, reference, agreement):
+    worst, worst_at, exact = 0.0, None, 0
     for case in frozen_cases:
-        want = golden_values(case.name, rundir / f"k_{case.name}.csv")
+        want = reference[case.name]
         got = run_case_through(simulate, case)
         assert got.shape == want.shape, (
             f"{case.name}: produced {got.shape}, reference is {want.shape}"
         )
-        diffs = ulp_diff(got, want)
-        peak = float(diffs.max())
-        if peak == 0.0:
-            exact += 1
+        peak, col = agreement.worst(got, want)
+        exact += peak == 0.0
         if peak > worst:
-            _, col = np.unravel_index(int(diffs.argmax()), diffs.shape)
             worst, worst_at = peak, f"{case.name}:{COLUMNS[col]}"
 
-    print(f"\n{exact}/{len(frozen_cases)} cases bit-identical; "
-          f"worst {worst:.0f} ULP" + (f" at {worst_at}" if worst_at else ""))
-    assert worst <= ULP_BUDGET, (
-        f"worst disagreement {worst:.0f} ULP at {worst_at}, budget {ULP_BUDGET}"
+    print(f"\n{agreement.describe()}\n{exact}/{len(frozen_cases)} cases exact; "
+          f"worst {worst:.3g} {agreement.unit()}" + (f" at {worst_at}" if worst_at else ""))
+    assert worst <= agreement.budget(), (
+        f"worst disagreement {worst:.3g} {agreement.unit()} at {worst_at}, "
+        f"budget {agreement.budget():g}; {agreement.describe()}"
     )
 
 
