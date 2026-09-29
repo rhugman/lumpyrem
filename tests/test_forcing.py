@@ -298,3 +298,62 @@ def test_fill_rules_match_the_reference_on_sparse_forcing(oracle_exe, frozen_cas
         f"diverged."
     )
     assert "itn limit exceeded" not in run.stdout
+
+
+# ---------------------------------------------------------------------------
+# Per-cell forcing
+# ---------------------------------------------------------------------------
+
+def _sparse_block(rng, ndays, ncell, *, same_days: bool):
+    """Values on scattered days, NaN elsewhere -- listed on the same days in
+    every cell, or on each cell's own days."""
+    block = rng.uniform(0.5, 3.0, (ndays, ncell))
+    if same_days:
+        keep = rng.random(ndays) < 0.2
+        keep[[0, -1]] = True
+        block[~keep] = np.nan
+    else:
+        keep = rng.random((ndays, ncell)) < 0.2
+        keep[[0, -1]] = True
+        block[~keep] = np.nan
+    return block
+
+
+@pytest.mark.parametrize("same_days", [True, False], ids=["shared-days", "own-days"])
+def test_grid_forcing_fills_each_cell_as_a_forcing_would_alone(same_days):
+    """Each column, every rule: exactly what a plain Forcing makes of it."""
+    from lumpyrem import GridForcing
+    rng = np.random.default_rng(11)
+    ndays, ncell = 90, 5
+    days = pd.date_range(EPOCH, periods=ndays)
+    blocks = {name: _sparse_block(rng, ndays, ncell, same_days=same_days)
+              for name in ("rainfall", "pot_evap", "crop_factor", "veg_gamma")}
+    shared = rng.uniform(0.0, 1.0, ndays)
+    for rules in (None, {"rainfall": "forward", "pot_evap": "interpolate",
+                         "crop_factor": "zero", "veg_gamma": "forward"}):
+        grid = GridForcing.from_arrays(days, fill=rules, gw_irrig_frac=shared, **blocks)
+        daily = grid.to_daily()
+        assert daily["rainfall"].shape == (ndays, ncell)
+        assert daily["gw_irrig_frac"].shape == (ndays,)
+        for c in range(ncell):
+            alone = Forcing.from_dataframe(
+                pd.DataFrame({k: v[:, c] for k, v in blocks.items()} | {
+                    "gw_irrig_frac": shared}, index=days), fill=rules).to_daily()
+            for name in VARIABLES:
+                col = daily[name] if daily[name].ndim == 1 else daily[name][:, c]
+                assert np.array_equal(col, alone[name]), (rules, c, name)
+
+
+def test_grid_forcing_names_the_cell_that_broke_a_rule():
+    from lumpyrem import GridForcing
+    rain = np.ones((10, 3))
+    rain[4, 2] = -1.0
+    with pytest.raises(ForcingError, match="rainfall must be >= 0; day 5, cell 2"):
+        GridForcing.from_arrays(EPOCH, rainfall=rain, pot_evap=1.0, veg_gamma=2.0).to_daily()
+    with pytest.raises(ForcingError, match="at least one"):
+        GridForcing.from_arrays(EPOCH, rainfall=np.ones(10), pot_evap=1.0, veg_gamma=2.0)
+    with pytest.raises(ForcingError, match="disagree on the number of cells"):
+        GridForcing.from_arrays(EPOCH, rainfall=np.ones((10, 3)), pot_evap=np.ones((10, 2)),
+                                veg_gamma=2.0)
+    with pytest.raises(ForcingError, match="unknown forcing variable"):
+        GridForcing.from_arrays(EPOCH, rain=np.ones((10, 3)))

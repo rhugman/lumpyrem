@@ -66,10 +66,11 @@ def forcing_for(case, *, start: pd.Timestamp = EPOCH) -> Forcing:
 
 
 def run_case_through_api(case, *, times=None, start: pd.Timestamp = EPOCH,
-                         on_nonconvergence: str = "ignore"):
+                         on_nonconvergence: str = "ignore", engine: str = "auto"):
     return model_for(case, on_nonconvergence=on_nonconvergence).run(
         forcing_for(case, start=start),
         times=case.outdays if times is None else times,
+        engine=engine,
     )
 
 

@@ -38,7 +38,7 @@ sys.path[:0] = [str(REPO_ROOT / "src"), str(REPO_ROOT / "tests")]
 
 import numba  # noqa: E402
 
-from lumpyrem import compiled, core  # noqa: E402
+from lumpyrem import compiled, core, engine  # noqa: E402
 from oracle.build import FFLAGS, VENDOR_DIR, gfortran  # noqa: E402
 
 HARNESS = """\
@@ -184,16 +184,15 @@ def time_fortran(exe: Path, spec: dict, reps: int) -> tuple[float, float, float]
 
 
 def time_numba(spec: dict, reps: int) -> tuple[float, np.ndarray]:
-    p = compiled.param_row(**{k: spec[k] for k in PARAM_KEYS})
-    forcing = compiled._forcing(*(spec[k] for k in FORCING_KEYS))
+    p = engine.param_row(**{k: spec[k] for k in PARAM_KEYS})
+    forcing = compiled._forcing(*(spec[k] for k in FORCING_KEYS), 1)
     outdays = np.ascontiguousarray(spec["outdays"], dtype=np.int64)
-    subdim = core.MAXDELAY
-    rbuf = np.zeros(subdim + 1)
-    mbuf = np.zeros(subdim + 1)
-    values = np.empty((compiled._nrows(outdays, forcing[0].size), compiled.NCOLUMN))
+    rbuf = np.zeros(1)          # empty initial buffers, 1-based
+    mbuf = np.zeros(1)
+    values = np.empty((engine.nrows(outdays, forcing[0].size), compiled.NCOLUMN))
     nonconv = np.zeros(2, dtype=np.int64)
     args = (p, rbuf, mbuf, *forcing, outdays, spec["nstep"], spec["mxiter"],
-            spec["tol"], subdim, values, nonconv)
+            spec["tol"], values, nonconv)
     compiled._simulate_cell(*args)          # compile, or load from cache
     best = float("inf")
     for _ in range(reps):
@@ -215,11 +214,11 @@ def time_python(spec: dict) -> float:
 def grid(spec: dict, ncell: int, seed: int = 7) -> np.ndarray:
     """``ncell`` parameter rows, each a +-20% perturbation of the site."""
     rng = np.random.default_rng(seed)
-    base = compiled.param_row(**{k: spec[k] for k in PARAM_KEYS})
+    base = engine.param_row(**{k: spec[k] for k in PARAM_KEYS})
     rows = np.tile(base, (ncell, 1))
-    for idx in (compiled.MAXVOL, compiled.KS, compiled.M, compiled.L, compiled.RDELAY):
+    for idx in (engine.MAXVOL, engine.KS, engine.M, engine.L, engine.RDELAY):
         rows[:, idx] *= rng.uniform(0.8, 1.2, ncell)
-    rows[:, compiled.VOL] = np.minimum(rows[:, compiled.VOL], rows[:, compiled.MAXVOL])
+    rows[:, engine.VOL] = np.minimum(rows[:, engine.VOL], rows[:, engine.MAXVOL])
     return rows
 
 
@@ -232,7 +231,7 @@ def run_grid(spec: dict, params: np.ndarray):
 
 def check_grid_equals_singles(spec: dict) -> None:
     """Phase 3 gate, correctness half: N cells == N single runs, exactly."""
-    base = compiled.param_row(**{k: spec[k] for k in PARAM_KEYS})
+    base = engine.param_row(**{k: spec[k] for k in PARAM_KEYS})
     same, _ = run_grid(spec, np.tile(base, (64, 1)))
     varied_params = grid(spec, 64)
     varied, _ = run_grid(spec, varied_params)

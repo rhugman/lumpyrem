@@ -22,13 +22,24 @@ Layers, each usable on its own:
     The designed API -- typed parameters, real dates, explicit resampling.
 ``lumpyrem.results``
     Labelled output, a balance check, a plot and a CSV writer.
+``lumpyrem.engine``, ``lumpyrem.compiled``
+    Many cells at once, on the Numba-compiled kernel when Numba is installed
+    and on ``core`` when it is not.  ``ModelGrid`` is the way in.
+``lumpyrem.io``
+    xarray Datasets and netCDF, for gridded forcing and results.  Needs
+    xarray, and is imported only when used.
 
-Phases 0-2 of ``docs/conversion-plan.md`` are complete.  Array-based and
-compiled execution arrive in Phase 3.
+Many independent cells::
+
+    from lumpyrem import ModelGrid
+
+    grid = ModelGrid.from_arrays(upper=dict(maxvol=maxvol, ks=ks, m=0.4, l=0.5))
+    results = grid.run(forcing, times="MS")
+    results.to_xarray()["total_rech"]          # (time, cell)
 """
 
-from .forcing import Fill, Forcing, ForcingError
-from .model import Model, ModelError
+from .forcing import Fill, Forcing, ForcingError, GridForcing
+from .model import Model, ModelError, ModelGrid
 from .parameters import (
     InitialState,
     LowerStore,
@@ -37,7 +48,7 @@ from .parameters import (
     UpperStore,
     VolumeToElevation,
 )
-from .results import ConvergenceWarning, Results
+from .results import ConvergenceWarning, GridResults, Results
 
 __version__ = "0.0.2"
 
@@ -46,10 +57,13 @@ __all__ = [
     "Fill",
     "Forcing",
     "ForcingError",
+    "GridForcing",
+    "GridResults",
     "InitialState",
     "LowerStore",
     "Model",
     "ModelError",
+    "ModelGrid",
     "ParameterError",
     "Results",
     "Solver",

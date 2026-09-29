@@ -4,12 +4,12 @@ A Python port of the [LUMPREM](https://pesthomepage.org) lumped-parameter
 recharge model, adding array-based forcing and output, a modern API, and
 compiled-speed execution.
 
-**Status: Phase 3 in progress.** The reference oracle is in place, the model
-kernel reproduces it bit-for-bit, and the Python API is built on top — real
-dates, typed parameters, explicit resampling. A Numba build of the kernel is
-bit-identical too, matches Fortran speed per cell and scales across cores
-(`pip install -e ".[fast]"`, `scripts/benchmark_numba.py`); the array API
-that uses it comes next. See
+**Status: Phase 3 nearly complete.** The reference oracle is in place, the
+model kernel reproduces it bit-for-bit, and the Python API is built on top —
+real dates, typed parameters, explicit resampling. A Numba build of the kernel
+is bit-identical too, runs at or under Fortran time per cell, and steps many
+cells in parallel behind `ModelGrid`, with results as xarray Datasets. The one
+open item is re-measuring the scaling on a quiet machine. See
 [docs/conversion-plan.md](docs/conversion-plan.md) for the full plan.
 
 ## Using it
@@ -36,6 +36,29 @@ A run that fails to converge warns instead of pretending; `Solver` takes
 `on_nonconvergence="raise"` or `"ignore"` if you would rather it did something
 else.
 
+### Many cells
+
+```python
+grid = lr.ModelGrid.from_arrays(
+    upper=dict(maxvol=maxvol, ks=ks, m=0.4, l=0.5, rdelay=rdelay),   # arrays or numbers
+    solver=lr.Solver(nstep=5),
+)
+results = grid.run(forcing, times="MS")   # a Forcing shared by every cell, or
+                                          # a GridForcing with one column per cell
+results["total_rech"]                     # DataFrame, time x cell
+results.to_xarray()                       # Dataset on (time, cell), one variable per column
+```
+
+Cells are independent, and every cell of a grid reproduces the same `Model` run
+alone exactly. With the `fast` extra, a grid runs on the compiled kernel across
+all cores; without it, the package still runs, on the pure-Python kernel. The
+`xarray` extra adds `lumpyrem.io`, which reads gridded forcing from netCDF and
+writes results to it.
+
+```bash
+pip install "lumpyrem[fast,xarray]"
+```
+
 ### Gap-filling is a choice, not a file format
 
 `lumprem2.f` fills gaps in its forcing by three different rules, decided by
@@ -57,14 +80,18 @@ lr.Forcing.from_dataframe(df, fill={"rainfall": "forward"})
 
 `lumpyrem.core` is a faithful scalar port of LUMPREM2's `rechmod` kernel and its
 simulation loop. It reproduces the Fortran **bit-for-bit — 0 ULP on every column
-of all 209 reference cases**, against a gate that allows 10. Everything above it
-— `parameters`, `forcing`, `model`, `results` — is designed rather than
+of all 209 reference cases**, against a gate that allows 10. `lumpyrem.compiled`
+is the same arithmetic built with Numba, with delay buffers held as rings sized
+to the delay rather than the Fortran's fixed 500-element arrays; it is held to
+the same gate and to exact equality with `core`. Everything above them —
+`parameters`, `forcing`, `model`, `results`, `io` — is designed rather than
 translated, and is held to reproducing those same numbers exactly.
 
-Fidelity is not just asserted. `tests/test_kernel_mutations.py` reintroduces
-each known trap in turn and requires the golden set to reject it, which is what
-found the two demotions and the one real coverage gap recorded in the plan; the
-API layer is checked the same way, by mis-marshalling a run on purpose.
+Fidelity is not just asserted. `tests/test_kernel_mutations.py` and
+`tests/test_compiled_mutations.py` reintroduce each known trap in turn, in each
+kernel, and require the golden set to reject it; that is what found the two
+demotions and the one real coverage gap recorded in the plan. The API and the
+grid are checked the same way, by mis-marshalling a run on purpose.
 
 ## The reference oracle
 
@@ -88,7 +115,7 @@ else. It lives under `tests/` and is never imported by the package.
 Requires Python 3.10+ and `gfortran` (for the oracle only).
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev,fast]"
 pytest
 ```
 

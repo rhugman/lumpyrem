@@ -20,7 +20,7 @@ import pandas as pd
 
 from .core import COLUMNS as KERNEL_COLUMNS
 
-__all__ = ["Results", "ConvergenceWarning", "COLUMNS"]
+__all__ = ["Results", "GridResults", "ConvergenceWarning", "COLUMNS"]
 
 
 class ConvergenceWarning(UserWarning):
@@ -40,6 +40,8 @@ def _rename(name: str) -> str:
 COLUMNS: tuple[str, ...] = tuple(_rename(c) for c in KERNEL_COLUMNS)
 
 _BALANCE = COLUMNS.index("balance")
+_RAINFALL = COLUMNS.index("rainfall")
+_IRRIGATION = COLUMNS.index("irrigation")
 _DEFAULT_PLOT = ("rainfall", "total_rech", "evap_upper", "runoff")
 
 
@@ -126,20 +128,17 @@ class Results:
         Returns:
             The largest absolute residual, or 0.0 for an empty run.
         """
-        resid = np.abs(self.values[:, _BALANCE])
-        if resid.size == 0:
-            return 0.0
-        worst = float(resid.max())
-        if not relative:
-            return worst
-        inflow = float(np.abs(self.column("rainfall")).sum()
-                       + np.abs(self.column("irrigation")).sum())
-        return worst / inflow if inflow > 0.0 else 0.0
+        return _balance_error(self.values, relative)
 
     # ------------------------------------------------------------------
     def to_csv(self, path, **kwargs):
         """Write the table as CSV.  Extra arguments go to pandas."""
         return self.to_dataframe().to_csv(path, **kwargs)
+
+    def to_xarray(self):
+        """An xarray Dataset on ``time``, one variable per column.  Needs xarray."""
+        from .io import to_dataset
+        return to_dataset(self)
 
     def plot(self, columns=None, *, ax=None, **kwargs):
         """Plot columns against time and return the Axes.
@@ -173,4 +172,121 @@ class Results:
         state = "converged" if self.converged else (
             f"NOT converged ({self.nonconverged_steps} sub-steps)")
         return (f"<Results: {len(self.days) - 1} output times, "
+                f"{self.times[0].date()} to {self.times[-1].date()}, {state}>")
+
+
+def _balance_error(values: np.ndarray, relative: bool) -> float:
+    """Worst ``balance`` residual of one cell's ``(nrows, 26)`` table."""
+    resid = np.abs(values[:, _BALANCE])
+    if resid.size == 0:
+        return 0.0
+    worst = float(resid.max())
+    if not relative:
+        return worst
+    inflow = float(np.abs(values[:, _RAINFALL]).sum() + np.abs(values[:, _IRRIGATION]).sum())
+    return worst / inflow if inflow > 0.0 else 0.0
+
+
+# ---------------------------------------------------------------------------
+# Many cells
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True, eq=False)
+class GridResults:
+    """A completed :class:`~lumpyrem.ModelGrid` run: every cell on one schedule.
+
+    Columns and conventions are those of :class:`Results`, with a ``cell``
+    axis added: ``values[t, c, k]`` is column ``k`` of cell ``c`` at output
+    time ``t``.  ``results["total_rech"]`` is then a ``(time, cell)`` table,
+    and :meth:`to_xarray` gives the same as a Dataset -- one variable per
+    column on ``(time, cell)`` -- which drops a recharge array straight into
+    a gridded groundwater model.
+
+    Attributes:
+        times: output instants, ``times[0]`` the start of the run.
+        days: the same instants as simulation day counts, ``days[0] == 0``.
+        values: ``(ntime, ncell, 26)`` float64, in :data:`COLUMNS` order.
+        cells: the cell labels, in order.
+        nonconverged: ``(ncell, 2)`` sub-step counts, upper then lower store,
+            that hit ``mxiter``.
+        has_elevation: ``(ncell,)``; False where a cell carried no
+            volume-to-elevation conversion and its last two columns are NaN.
+    """
+
+    times: pd.DatetimeIndex
+    days: np.ndarray
+    values: np.ndarray
+    cells: tuple
+    nonconverged: np.ndarray
+    has_elevation: np.ndarray
+    columns: tuple[str, ...] = COLUMNS
+
+    # ------------------------------------------------------------------
+    @property
+    def ncell(self) -> int:
+        return len(self.cells)
+
+    @property
+    def converged(self) -> bool:
+        """True when every sub-step of every cell met the solver tolerance."""
+        return not self.nonconverged.any()
+
+    @property
+    def nonconverged_cells(self) -> list:
+        """Labels of the cells with any sub-step that hit ``mxiter``."""
+        return [self.cells[i] for i in np.flatnonzero(self.nonconverged.sum(axis=1))]
+
+    def __len__(self) -> int:
+        return len(self.days)
+
+    def column(self, name: str) -> np.ndarray:
+        """One column as a ``(time, cell)`` float64 array."""
+        try:
+            return self.values[:, :, self.columns.index(name)]
+        except ValueError:
+            raise KeyError(
+                f"no column {name!r}; available columns are {list(self.columns)}"
+            ) from None
+
+    def __getitem__(self, name: str) -> pd.DataFrame:
+        """One column as a table, indexed by time with a column per cell."""
+        frame = pd.DataFrame(self.column(name), index=self.times,
+                             columns=pd.Index(self.cells, name="cell"))
+        frame.index.name = "time"
+        return frame
+
+    def cell(self, label) -> Results:
+        """One cell's results, exactly as :meth:`Model.run` would return them."""
+        try:
+            i = self.cells.index(label)
+        except ValueError:
+            raise KeyError(f"no cell {label!r}") from None
+        return Results(
+            times=self.times, days=self.days, values=self.values[:, i, :].copy(),
+            nonconverged_upper=int(self.nonconverged[i, 0]),
+            nonconverged_lower=int(self.nonconverged[i, 1]),
+            has_elevation=bool(self.has_elevation[i]),
+        )
+
+    def balance_error(self, *, relative: bool = False) -> pd.Series:
+        """Each cell's worst water-balance residual; see :meth:`Results.balance_error`."""
+        return pd.Series([_balance_error(self.values[:, i, :], relative)
+                          for i in range(self.ncell)],
+                         index=pd.Index(self.cells, name="cell"), name="balance_error")
+
+    # ------------------------------------------------------------------
+    def to_xarray(self):
+        """An xarray Dataset on ``(time, cell)``, one variable per column."""
+        from .io import to_dataset
+        return to_dataset(self)
+
+    def to_netcdf(self, path, **kwargs):
+        """Write :meth:`to_xarray` to netCDF.  Extra arguments go to xarray."""
+        from .io import to_netcdf
+        return to_netcdf(self, path, **kwargs)
+
+    def __repr__(self) -> str:
+        failed = len(self.nonconverged_cells)
+        state = "converged" if failed == 0 else f"{failed} cell(s) NOT converged"
+        return (f"<GridResults: {self.ncell} cells x {len(self.days) - 1} output times, "
                 f"{self.times[0].date()} to {self.times[-1].date()}, {state}>")

@@ -13,12 +13,13 @@ dependencies = ["numpy>=1.24", "pandas>=2.0"]
 
 [project.optional-dependencies]
 # Numba's supported NumPy ceiling is why this is pinned; see docs/conversion-plan.md
-# section 7.  Phase 3 settles whether Numba delivers before the array API is
-# built on top of it.
+# section 7.  Without it the package still runs, on the pure-Python kernel.
 fast = ["numba>=0.60", "numpy<2.4"]
 plot = ["matplotlib>=3.7"]
-test = ["pytest>=7", "matplotlib>=3.7"]
-dev = ["pytest>=7", "ruff>=0.6", "matplotlib>=3.7"]
+# lumpyrem.io: gridded forcing and results as xarray Datasets and netCDF.
+xarray = ["xarray>=2024.6", "netCDF4>=1.6"]
+test = ["pytest>=7", "matplotlib>=3.7", "xarray>=2024.6", "netCDF4>=1.6"]
+dev = ["pytest>=7", "ruff>=0.6", "matplotlib>=3.7", "xarray>=2024.6", "netCDF4>=1.6"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/lumpyrem"]
@@ -47,6 +48,8 @@ select = ["E", "F", "I", "UP", "B", "SIM", "NPY"]
 # compiled.py is the same translation in a form Numba accepts, held to the same
 # gate, so it keeps the same shape for the same reason.
 "src/lumpyrem/compiled.py" = ["E741", "SIM102"]
+# engine.py packs and unpacks the kernel's parameters under the kernel's names.
+"src/lumpyrem/engine.py" = ["E741"]
 # "l" is what both manuals and the soil-physics literature call the Mualem
 # pore-connectivity exponent; renaming it in the public API would cost more
 # than it saves.

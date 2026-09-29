@@ -177,9 +177,9 @@ bit-fidelity; everything above it is free to be designed rather than translated.
 
 | Layer | Module | Responsibility |
 |---|---|---|
-| **Kernel** | `lumpyrem.core` | Numba-compiled `rechmod`; float64 scalars and arrays only, no I/O, no objects. The thing that must be bit-faithful. |
+| **Kernel** | `lumpyrem.core`, `lumpyrem.compiled`, `lumpyrem.engine` | `rechmod`; float64 scalars and arrays only, no I/O, no objects. The thing that must be bit-faithful. *As built: `core` is the readable translation, `compiled` its Numba build, and `engine` packs cells into rows and picks between them; see Phase 3.* |
 | **Model** | `lumpyrem.model`, `lumpyrem.parameters` | `Model` and `ModelGrid`: typed parameter objects, forcing, solver settings, `.run()` → results. |
-| **I/O** | `lumpyrem.forcing`, `lumpyrem.results` | Forcing in from DataFrame / array / CSV / netCDF; results out as DataFrame, xarray or CSV. No fixed-format files. *Built as constructors and methods rather than a separate `lumpyrem.io`; see Phase 2.* |
+| **I/O** | `lumpyrem.forcing`, `lumpyrem.results`, `lumpyrem.io` | Forcing in from DataFrame / array / CSV / netCDF; results out as DataFrame, xarray or CSV. No fixed-format files. *CSV and DataFrames stay as constructors and methods (Phase 2); `lumpyrem.io` holds xarray and netCDF (Phase 3).* |
 | **Coupling** | `lumpyrem.mf6` | MODFLOW 6 handoff via flopy, MF6 time series, and pyEMU parameterisation for calibration. |
 | *— tests only —* | `tests/oracle` | Legacy `.in` writer and tabular reader, used solely to drive and read the Fortran reference. Never imported by the package. |
 
@@ -282,7 +282,8 @@ Three decisions worth recording:
 
 - **Validation is stricter than the reference, deliberately.** Where
   `lumprem2.f` silently clamps — `gamma_br` into [0.1, 10], both delays at
-  `MAXDELAY - 2` — the objects refuse. A silently clamped parameter is worse
+  `MAXDELAY - 2` — the objects refuse. *(Phase 3 removed the delay ceiling
+  altogether, with the fixed buffers; any delay is now accepted.)* A silently clamped parameter is worse
   than an error inside a calibration loop, because the knob keeps turning and
   the model stops responding to it. `veg_gamma <= 0` is rejected too; the
   Fortran evaluates 0/0 there and carries the NaN onwards without comment.
@@ -307,7 +308,7 @@ Three decisions worth recording:
 > driven from genuinely *sparse* forcing files, which the dense Phase 0 cases
 > were designed never to produce, and the Python rules reproduce it exactly.
 
-### Phase 3 — Array-based and compiled (2–3 weeks) — **in progress**
+### Phase 3 — Array-based and compiled (2–3 weeks) — **complete but for one re-measurement**
 
 The main extension, and the one with real engineering risk. Start by
 benchmarking Numba, because the whole design rests on it.
@@ -331,39 +332,118 @@ benchmarking Numba, because the whole design rests on it.
 
 > **Gate** — An *N*-cell run with identical parameters matches *N* single runs
 > exactly; per-cell time <= Fortran; scaling is near-linear to physical core
-> count.
+> count. **Correctness and per-cell time: met. Scaling: met at ~85% on 12
+> cores as first measured, but under heavy load; to be re-measured on a quiet
+> machine before it is quoted.**
 
-*As built so far:* the Numba benchmark, which the plan put first because
-everything else rests on it. `lumpyrem.compiled` is the `core` arithmetic
-rewritten into the shape Numba accepts — no dataclasses, no `for`-`else`,
-parameters packed into one float64 row per cell — with `simulate()` as a
-drop-in for `core.simulate()` and `simulate_cells()` running cells under
-`prange`. `core` stays as the readable translation and the fallback.
+*As built:*
 
-- **Phase 1 gate, unchanged: met at 0 ULP.** All 209 golden cases are
-  bit-identical, and `compiled` is required to equal `core` exactly — values,
-  output days and non-convergence counts. LLVM keeps the expression order and
-  does not contract to FMAs without `fastmath`, so the port survived
-  compilation untouched. `error_model="numpy"` lets a zero divisor produce
-  inf/nan as the Fortran does instead of raising, and changes nothing for
-  finite inputs.
-- **Correctness half of this gate: met.** An *N*-cell run reproduces *N*
-  single runs bit for bit, both for identical cells and for 31 golden cases
-  sharing one schedule; a cell-order slip is caught by 30 of the 31.
-- **Per-cell time <= Fortran: met.** 0.97x (one store) and 0.94x (two
-  stores), timed in alternating rounds against the harness.
-- **Near-linear scaling: provisionally met.** 2048 cells: 3.8x on 4 threads,
-  7.4x on 8, 10.2x on 12 (85% efficiency), 11.7x on 16, where the four
-  efficiency cores join. *Measured with the machine at a load average of
-  ~65 from other work* — the Fortran/Numba ratio is protected by alternating
-  the two, but absolute times and scaling are not, and should be re-measured
-  on a quiet machine before being quoted. Cells with a ±20% parameter spread
-  vary in cost, and `prange`'s static chunking loses a few percent to that.
+- **The compiled kernel.** `lumpyrem.compiled` is the `core` arithmetic
+  rewritten into the shape Numba accepts — no dataclasses, no `for`-`else`,
+  parameters packed into one float64 row per cell — with `simulate()` as a
+  drop-in for `core.simulate()` and `simulate_cells()` running cells under
+  `prange`. LLVM keeps the expression order and does not contract to FMAs
+  without `fastmath`, so the port survived compilation untouched.
+  `error_model="numpy"` lets a zero divisor produce inf/nan as the Fortran
+  does instead of raising, and changes nothing for finite inputs. It is held to
+  the Phase 1 gate unchanged, **met at 0 ULP on all 209 cases**, and to exact
+  equality with `core`: values, output days and non-convergence counts.
 
-Not started: ring buffers sized to the delay, `ModelGrid`, xarray results, and
-mutation coverage of `compiled` (`test_kernel_mutations.py` still only mutates
-`core`, so `compiled` is held by the golden set and by equality with `core`,
-not by its own mutation survey).
+- **Delay buffers, sized to the delay.** `compiled` holds each buffer as a
+  ring of `int(delay) + 1` slots, and a day's shift is a move of the ring's
+  head; `core` keeps the Fortran's shifting array, sized per run to the longest
+  delay or initial buffer rather than to 500. Neither changes a number, and
+  the argument is short enough to state:
+  - a shift moves values without touching them, so it has no rounding to keep;
+  - every element past `int(delay) + 1` is zero after the first call's sweep
+    (trap 7), and adding zero to a sum that starts at `0.0` is exact, so the
+    Fortran's sums over all 500 elements — `totd` and `totm`, and through them
+    `vol_drain`, `vol_macro` and `balance` — equal sums over the ring taken in
+    the same logical order, newest first;
+  - an initial buffer longer than the delay is claimed on the first call, as
+    the Fortran's sweep does, summed in its order, and then lost from the lower
+    store exactly as trap 14 loses it.
+
+  The plan's `ceil(rdelay) + 1` is one slot too many for a fractional delay:
+  trap 7 reads element `int(rdelay) + 1` and nothing past it, and a ring of the
+  larger size re-times the release. The mutation survey below carries that
+  sizing as a mutation, and 18 cases reject it.
+
+  It pays where the plan expected. On the benchmark workload with daily output,
+  the compiled kernel drops from 6.6–7.1 to 3.35 ms per cell (one store) and
+  from 8.9–9.3 to 5.8 ms (two stores); with 30-day output, where the Fortran's
+  per-call sums were already amortised, nothing changes. The pure-Python
+  fallback gains 4–6x on daily output, since it no longer walks 500 elements
+  per call. The `MAXDELAY - 2` ceiling is gone with the fixed arrays, so
+  `UpperStore` accepts any delay; beyond 498 days the reference cannot follow,
+  and there the two buffer implementations, which share no code, are held to
+  each other exactly on randomised cases with delays and initial buffers up to
+  ~900 and ~1,200 days (`tests/test_delay_buffers.py`).
+
+- **`lumpyrem.engine`, and the fallback without Numba.** The parameter-row
+  layout lives in `engine`, which never imports Numba, and `run_cells()` takes
+  the compiled kernel when Numba imports and runs `core.simulate()` per cell
+  when it does not. `Model.run()` and `ModelGrid.run()` both go through it, and
+  take `engine="auto" | "compiled" | "python"`; since the two kernels are held
+  to exact equality the choice is speed, never results, and the Phase 2 gate
+  now runs on both. *The fallback is `core`, not a NumPy kernel vectorised over
+  cells.* Section 3 measured that at 2–17x slower than one core of Fortran, and
+  it could not keep bit-identity either: on x86 with AVX-512, NumPy evaluates
+  `exp` with its own SIMD routines rather than the maths library's. A test
+  runs the package end to end in an interpreter where `import numba` fails.
+
+- **`ModelGrid`.** A grid is a tuple of `Model`s sharing one `Solver` — the
+  kernel steps every cell with the same `nstep`, `mxiter` and `tol` — plus
+  labels for the cells. `ModelGrid.from_arrays()` takes each parameter field
+  as a number shared by every cell or an array with one value per cell, and
+  validates each cell as a `Model` would, naming the cell in any error.
+  Building 10,000 cells takes 0.16 s and packing them 0.05 s, against ~4 s for
+  a ten-year monthly run, so the object layer costs about 5%. Forcing is a
+  `Forcing` shared by every cell or a `GridForcing`, whose variables are each an
+  `(ntime, ncell)` block, a shared series or a constant; the kernel takes each
+  variable as one shared row or one row per cell, so memory grows only with
+  what actually differs between cells. The fill rules apply per cell column
+  (vectorised when the cells list the same days) and are held to what a plain
+  `Forcing` makes of each column alone.
+
+  **The gate: every cell of a grid equals its own `Model.run()`, exactly** —
+  values, days and convergence counts — for shared and per-cell forcing, on
+  both engines, over the 31 golden cases that share one schedule, and each cell
+  reproduces `core.simulate()` called directly and the Fortran reference. It
+  has teeth: rows of parameters, initial buffers, per-cell forcing and results
+  are each shifted by one cell on purpose, and all four are rejected. A
+  `GridForcing` read from a file carries its cell labels, and a grid refuses
+  forcing whose labels do not match its own, in order — so a file's column
+  order cannot silently re-assign climate to cells either.
+
+- **xarray and netCDF.** `GridResults` keeps `(time, cell, variable)` as its
+  `values` array; `results["total_rech"]` is a time-by-cell DataFrame and
+  `results.cell(label)` a `Results` identical to the single run.
+  `lumpyrem.io` — introduced here, as Phase 2 planned — turns results into a
+  Dataset with one variable per column on `(time, cell)`, writes it to netCDF
+  losslessly, and reads gridded forcing back as a `GridForcing`. xarray and
+  netCDF4 form the `xarray` extra and are imported only when used.
+
+- **Mutation coverage of `compiled`.** `tests/test_compiled_mutations.py`
+  does for `compiled` what the core survey does for `core`, against a fresh,
+  uncached Numba build of the unmutated module, and adds traps 2 and 12, which
+  the core survey leaves to the paired cases. It also carries seven mutations
+  of the ring buffers: summing the ring oldest first, dropping the first-call
+  claim or releasing it on every call, totalling day 0 over the ring only,
+  sizing the ring `ceil(delay) + 1`, never moving the head, and resetting the
+  head on every call. **Every mutation is rejected**, by between 9 and 205 of
+  the 209 cases, and none by crashing; the summation-order mutation alone moves
+  88. Traps 4 and 6 remain provably inert in the compiled build too.
+
+- **Near-linear scaling: provisionally met.** First measured at 2048 cells:
+  3.8x on 4 threads, 7.4x on 8, 10.2x on 12 (85% efficiency), 11.7x on 16,
+  where the four efficiency cores join — *with the machine at a load average
+  of ~65*. Re-run after the ring buffers at a load of 7–11: 0.90–0.91x Fortran
+  per cell, checksums exact, and 6.6x on 12 threads, which says more about the
+  load than the kernel. The Fortran/Numba ratio is protected by alternating the
+  two; absolute times and scaling are not, and still need a quiet machine.
+  Cells with a ±20% parameter spread vary in cost, and `prange`'s static
+  chunking loses a few percent to that.
 
 ### Phase 4 — MODFLOW and PEST coupling (1 week)
 
@@ -451,6 +531,9 @@ They belong in the porting checklist and, ideally, as named test cases.
    releases `(1 - frdelay)` of the tail element and scales what remains by
    `frdelay`. There is also a first-pass sweep that claims anything sitting
    beyond `irdelay`, which matters when a delay is shortened between calls.
+   *In Phase 3 it matters when an initial buffer is longer than the delay:
+   the ring buffers are exactly `irdelay` long, so that tail is claimed before
+   the ring is filled, in the sweep's order, and released on the first call.*
 8. **Elevation clamps before it converts.** It uses `min(vol, maxvol)` — or the
    lower store's volume when that store is active — floored at `1e-10` so a
    negative `power` cannot blow up, then clipped to `[elevmin, elevmax]`.
@@ -656,6 +739,7 @@ are the ones not to compress: every later gate is only as trustworthy as the
 oracle built in Phase 0, and that oracle now carries the project's only
 legacy-format code.
 
-Phases 0–2 are complete, and Phase 3 is under way with its main risk retired.
-`pandas` joins `numpy` as a runtime dependency from Phase 2 on; `matplotlib`
-stays optional, behind `Results.plot()`, and `numba` behind the `fast` extra.
+Phases 0–2 are complete, and Phase 3 is complete but for re-measuring its
+scaling on a quiet machine. `pandas` joins `numpy` as a runtime dependency from
+Phase 2 on; `matplotlib` stays optional, behind `Results.plot()`, `numba`
+behind the `fast` extra, and `xarray` and `netCDF4` behind the `xarray` extra.

@@ -20,7 +20,7 @@ from lumpyrem import (
     UpperStore,
     VolumeToElevation,
 )
-from lumpyrem.parameters import LOWER_STORE_CROP_FACTOR, MAX_DELAY_DAYS
+from lumpyrem.parameters import LOWER_STORE_CROP_FACTOR
 
 GOOD_UPPER = dict(maxvol=0.3, ks=0.05, m=0.4, l=0.5)
 
@@ -53,11 +53,15 @@ def test_upper_store_rejects(bad, field):
     assert exc.value.field == field
 
 
-def test_the_delay_ceiling_is_refused_rather_than_clamped():
-    """lumprem2.f silently sets any longer delay to MAXDELAY - 2."""
-    UpperStore(**GOOD_UPPER, rdelay=MAX_DELAY_DAYS)
-    with pytest.raises(ParameterError, match="clamps silently"):
-        UpperStore(**GOOD_UPPER, rdelay=MAX_DELAY_DAYS + 1)
+def test_there_is_no_delay_ceiling():
+    """lumprem2.f silently sets any delay over MAXDELAY - 2 = 498 to 498.  The
+    buffers are sized to the delay now, so there is no ceiling to clamp to or
+    refuse at; tests/test_delay_buffers.py runs such a model."""
+    assert UpperStore(**GOOD_UPPER, rdelay=5000.5, mdelay=499.0).rdelay == 5000.5
+    InitialState(vol=0.0, drain_buffer=(0.1,) * 2000)
+    with pytest.raises(ParameterError) as exc:
+        UpperStore(**GOOD_UPPER, mdelay=-0.5)
+    assert exc.value.field == "mdelay"
 
 
 def test_the_lower_store_gamma_range_is_refused_rather_than_clamped():
@@ -108,7 +112,7 @@ def test_elevation_clips_must_be_ordered():
     assert exc.value.field == "elevmax"
 
 
-def test_buffers_must_be_non_negative_and_fit():
+def test_buffers_must_be_non_negative_and_non_empty():
     InitialState(vol=0.0, drain_buffer=(0.0, 1.0, 2.0))
     with pytest.raises(ParameterError) as exc:
         InitialState(vol=0.0, drain_buffer=(1.0, -1.0))

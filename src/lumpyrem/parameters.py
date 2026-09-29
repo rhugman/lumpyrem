@@ -3,9 +3,11 @@
 Each object owns one block of the model specification and validates itself on
 construction.  Validation is deliberately *stricter* than the Fortran reader:
 where the reader silently clamps a value into range -- ``gamma_br`` into
-[0.1, 10], the delays into ``MAXDELAY - 2`` -- this layer refuses it instead,
-because a silently clamped parameter is a calibration that quietly stops
-responding to the knob being turned.
+[0.1, 10] -- this layer refuses it instead, because a silently clamped
+parameter is a calibration that quietly stops responding to the knob being
+turned.  The one clamp that is gone rather than refused is the Fortran's delay
+ceiling of ``MAXDELAY - 2 = 498`` days: the delay buffers are now sized to the
+delay, so there is no ceiling to enforce.
 
 Every failure raises :class:`ParameterError`, which carries the owning class,
 the field, the offending value and the requirement it broke, so a caller can
@@ -17,8 +19,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import isfinite
 
-from .core import MAXDELAY
-
 __all__ = [
     "ParameterError",
     "UpperStore",
@@ -26,14 +26,8 @@ __all__ = [
     "Solver",
     "VolumeToElevation",
     "InitialState",
-    "MAX_DELAY_DAYS",
     "LOWER_STORE_CROP_FACTOR",
 ]
-
-#: The longest delay the kernel can carry.  ``lumprem2.f`` clamps to this; the
-#: objects below reject instead.  Phase 3 replaces the fixed buffers with ring
-#: buffers sized to the delay, which removes the ceiling entirely.
-MAX_DELAY_DAYS = MAXDELAY - 2
 
 #: The lower store's crop factor is hardwired to 1.0 in ``rechmod2.f`` -- marked
 #: ``! hardwired`` there (trap 10).  It is surfaced as a named constant rather
@@ -85,8 +79,6 @@ def _check_buffer(owner: str, name: str, values) -> tuple[float, ...]:
         out = tuple(float(v) for v in values)
     except (TypeError, ValueError):
         raise ParameterError(owner, name, values, "be a sequence of real numbers") from None
-    _require(len(out) <= MAXDELAY, owner, name, len(out),
-             f"hold at most MAXDELAY = {MAXDELAY} entries")
     for i, v in enumerate(out):
         _require(isfinite(v) and v >= 0.0, owner, f"{name}[{i}]", v, "be finite and >= 0")
     return out
@@ -115,7 +107,8 @@ class UpperStore:
             becomes runoff.
         irrigvolfrac: irrigation tops the store up to this fraction of
             ``maxvol`` on any day the forcing asks for it.
-        rdelay: days of delay on drainage leaving the store.
+        rdelay: days of delay on drainage leaving the store.  Any length;
+            ``lumprem2.f`` clamped silently at 498.
         mdelay: days of delay on macropore flow leaving the store.
     """
 
@@ -140,9 +133,7 @@ class UpperStore:
                  self.irrigvolfrac, "be in [0, 1]")
         for name in ("rdelay", "mdelay"):
             v = getattr(self, name)
-            _require(0.0 <= v <= MAX_DELAY_DAYS, o, name, v,
-                     f"be in [0, {MAX_DELAY_DAYS}] "
-                     f"(lumprem2.f clamps silently at MAXDELAY - 2)")
+            _require(v >= 0.0, o, name, v, "be >= 0")
 
 
 @dataclass(frozen=True)

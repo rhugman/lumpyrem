@@ -9,6 +9,10 @@ itself that is refused outright: exact equality, not a budget, on every
 platform.  Against the Fortran reference the rule in tests/reference.py
 applies -- exact where the maths libraries agree, a tolerance where they do
 not.
+
+``Model.run`` reaches the kernel through ``lumpyrem.engine``, which takes the
+compiled build when Numba is installed and ``core`` when it is not, so the
+gate runs on both.
 """
 
 from __future__ import annotations
@@ -22,18 +26,22 @@ import pytest
 from api_compare import EPOCH, dates_for, forcing_for, model_for, run_case_through_api
 from kernel_compare import run_case_through
 from lumpyrem import Forcing
+from lumpyrem import engine as lp_engine
 from lumpyrem.core import simulate
 from lumpyrem.results import COLUMNS
 from ulp import ulp_diff
 
+ENGINES = ["python"] + (["compiled"] if lp_engine.compiled_available() else [])
 
-def test_api_reproduces_every_golden_case(frozen_cases, reference, agreement):
+
+@pytest.mark.parametrize("engine", ENGINES)
+def test_api_reproduces_every_golden_case(frozen_cases, reference, agreement, engine):
     """The gate.  Object API vs the Fortran reference, bit for bit where the
     maths libraries allow it."""
     worst, worst_at = 0.0, None
     for case in frozen_cases:
         want = reference[case.name]
-        got = run_case_through_api(case).values
+        got = run_case_through_api(case, engine=engine).values
         assert got.shape == want.shape, (
             f"{case.name}: API produced {got.shape}, reference is {want.shape}"
         )
@@ -48,11 +56,12 @@ def test_api_reproduces_every_golden_case(frozen_cases, reference, agreement):
     )
 
 
-def test_api_matches_the_phase_1_function_call(frozen_cases):
+@pytest.mark.parametrize("engine", ENGINES)
+def test_api_matches_the_phase_1_function_call(frozen_cases, engine):
     """Independently of the goldens: the two ways of driving the kernel agree."""
     for case in frozen_cases:
         direct = run_case_through(simulate, case)
-        through_api = run_case_through_api(case).values
+        through_api = run_case_through_api(case, engine=engine).values
         assert ulp_diff(direct, through_api).max() == 0.0, case.name
 
 

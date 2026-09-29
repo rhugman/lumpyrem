@@ -8,9 +8,23 @@ held to the same gate as ``core`` -- bit-identity with the golden files -- so
 every expression below keeps the grouping and order of its counterpart there.
 Trap numbers refer to ``docs/conversion-plan.md``.
 
-Phase 3, first step: the delay buffers are still the literal ``MAXDELAY``
-arrays.  Ring buffers sized to the actual delay come after the benchmark has
-shown this is worth building on.
+The one structural departure is the delay buffers.  ``lumprem2.f`` holds
+each in a fixed ``MAXDELAY = 500`` array and shifts it every day; here each is
+a ring of exactly ``int(delay) + 1`` slots -- the elements trap 7 ever reads --
+and a day's shift is a move of the ring's head.  Nothing arithmetic changes:
+
+- The shift moves values without touching them, so it has no rounding to
+  preserve.  Logical element ``i`` (1-based, newest first, as in the Fortran)
+  lives at ``(head + i - 1) % n``.
+- Everything past ``int(delay) + 1`` is zero after the first call's sweep,
+  and adding zero to a sum that starts at ``0.0`` is exact.  So the Fortran's
+  sums over all ``MAXDELAY`` elements equal sums over the ring, taken in the
+  same logical order -- which ``_ring_total`` keeps.
+- Initial buffers may hold water beyond the delay.  The first call's sweep
+  claims it (trap 7), summed in the Fortran's order, before the ring is
+  filled; ``_rechmod`` releases that claim on its first call and zero after,
+  which is what the sweep over an emptied tail produces.  Trap 14 then loses
+  it from the lower store exactly as the reference does.
 """
 
 from __future__ import annotations
@@ -20,15 +34,37 @@ from math import exp
 import numpy as np
 from numba import njit, prange
 
-from .core import COLUMNS, ELEVATION_FLOOR, MAXDELAY, Simulation
-
-# -- Per-cell parameter row.  Everything a cell can differ in is a float64 so
-#    one (ncell, NPARAM) array carries a whole grid.
-MAXVOL, IRRIGVOLFRAC, RDELAY, MDELAY, KS, M, L, MFLOWMAX = range(8)
-MAXVOL_BR, EXTRAVOL_BR, GAMMA_BR, KS_BR, M_BR, L_BR = range(8, 14)
-OFFSET, FACTOR1, FACTOR2, POWER, DATUM, NBUCKET, ELEVMIN, ELEVMAX = range(14, 22)
-VOL, VOL_BR = range(22, 24)
-NPARAM = 24
+from .core import COLUMNS, ELEVATION_FLOOR, Simulation
+from .engine import (
+    DATUM,
+    ELEVMAX,
+    ELEVMIN,
+    EXTRAVOL_BR,
+    FACTOR1,
+    FACTOR2,
+    GAMMA_BR,
+    IRRIGVOLFRAC,
+    KS,
+    KS_BR,
+    L_BR,
+    M_BR,
+    MAXVOL,
+    MAXVOL_BR,
+    MDELAY,
+    MFLOWMAX,
+    NBUCKET,
+    NPARAM,
+    OFFSET,
+    POWER,
+    RDELAY,
+    VOL,
+    VOL_BR,
+    L,
+    M,
+    buffer_rows,
+    nrows,
+    param_row,
+)
 
 # -- Totals accumulated over one rechmod call; mirrors core.Fluxes.
 (F_RAINFALL, F_RECHARGE, F_DRAINAGE_BR, F_OVERFLOW_BR, F_MRECHARGE, F_RUNOFF,
@@ -67,10 +103,53 @@ def evap(vd, epot, cropfac, gamma):
 
 
 @njit(**_JIT)
-def _rechmod(p, state, drainsub, macsub, nonconv, iday1, iday2,
+def _tail(head, n):
+    """Physical slot of logical element ``n``, the oldest in a ring of ``n``."""
+    t = head - 1
+    if t < 0:
+        t = n - 1
+    return t
+
+
+@njit(**_JIT)
+def _ring_total(ring, head):
+    """Sum over logical elements 1 to n, in the Fortran's order."""
+    n = ring.shape[0]
+    total = 0.0
+    k = head
+    for _ in range(n):
+        total = total + ring[k]
+        k = k + 1
+        if k == n:
+            k = 0
+    return total
+
+
+@njit(**_JIT)
+def _fill_ring(buf, n, ring):
+    """Load an initial 1-based buffer into a ring of ``n``, head at slot 0.
+
+    Returns what sits beyond logical element ``n``: the first call's sweep
+    (trap 7), summed in the order the Fortran sums it.
+    """
+    for i in range(1, n + 1):
+        ring[i - 1] = buf[i] if i < buf.shape[0] else 0.0
+    claim = 0.0
+    for i in range(n + 1, buf.shape[0]):
+        claim = claim + buf[i]
+    return claim
+
+
+@njit(**_JIT)
+def _rechmod(p, state, drainsub, macsub, heads, claim, nonconv, iday1, iday2,
              rain, epot, cropfac_day, gamma_day, irrigcode, gwirrigfrac, epot_br,
-             nstep, mxiter, tol, subdim, f):
-    """One ``rechmod`` call over days ``[iday1, iday2)``.  See core.rechmod."""
+             nstep, mxiter, tol, f):
+    """One ``rechmod`` call over days ``[iday1, iday2)``.  See core.rechmod.
+
+    ``drainsub`` and ``macsub`` are rings of ``irdelay`` and ``imdelay``
+    slots whose heads are ``heads[0]`` and ``heads[1]``; ``claim`` holds the
+    sweep of the initial buffers, released once.
+    """
     maxvol = p[MAXVOL]
     ks = p[KS]
     m = p[M]
@@ -107,23 +186,22 @@ def _rechmod(p, state, drainsub, macsub, nonconv, iday1, iday2,
     recharge_for_br = 0.0
     iflag_br = 1
 
-    # trap 7, first-pass sweep
+    # trap 7, first-pass sweep: taken from the initial buffers by
+    # _fill_ring, and nothing on any later call.
     irdelay = int(rdelay)
     frdelay = rdelay - irdelay
     irdelay = irdelay + 1
     imdelay = int(mdelay)
     fmdelay = mdelay - imdelay
     imdelay = imdelay + 1
-    if irdelay + 1 <= subdim:
-        for i in range(irdelay + 1, subdim + 1):
-            recharge = recharge + drainsub[i]
-            drainsub[i] = 0.0
+    recharge = recharge + claim[0]
+    claim[0] = 0.0
     if maxvol_br > 0.0:
         recharge_for_br = recharge
-    if imdelay + 1 <= subdim:
-        for i in range(imdelay + 1, subdim + 1):
-            mrecharge = mrecharge + macsub[i]
-            macsub[i] = 0.0
+    mrecharge = mrecharge + claim[1]
+    claim[1] = 0.0
+    hd = heads[0]
+    hm = heads[1]
 
     for iday in range(iday1, iday2):
         train = rain[iday] * tstep
@@ -217,27 +295,29 @@ def _rechmod(p, state, drainsub, macsub, nonconv, iday1, iday2,
         irrigation = irrigation + dayirrigation
         gwithdrawal = gwithdrawal + daygwithdrawal
 
-        # trap 7, whole and fractional days
-        recharge = recharge + drainsub[irdelay]
-        mrecharge = mrecharge + macsub[imdelay]
+        # trap 7, whole and fractional days.  The shift is a move of each
+        # head onto its tail slot, which then takes the day's inflow as
+        # logical element 1.
+        td = _tail(hd, irdelay)
+        tm = _tail(hm, imdelay)
+        recharge = recharge + drainsub[td]
+        mrecharge = mrecharge + macsub[tm]
         if iflag_br == 1:                                 # trap 14
-            recharge_for_br = drainsub[irdelay]
+            recharge_for_br = drainsub[td]
         else:
-            recharge_for_br = recharge_for_br + drainsub[irdelay]
+            recharge_for_br = recharge_for_br + drainsub[td]
             iflag_br = 0
-        if irdelay > 1:
-            for i in range(irdelay, 1, -1):
-                drainsub[i] = drainsub[i - 1]
-        if imdelay > 1:
-            for i in range(imdelay, 1, -1):
-                macsub[i] = macsub[i - 1]
-        drainsub[1] = dayrech
-        macsub[1] = daymrech
-        recharge = recharge + (1.0 - frdelay) * drainsub[irdelay]
-        recharge_for_br = recharge_for_br + (1.0 - frdelay) * drainsub[irdelay]
-        drainsub[irdelay] = frdelay * drainsub[irdelay]
-        mrecharge = mrecharge + (1.0 - fmdelay) * macsub[imdelay]
-        macsub[imdelay] = fmdelay * macsub[imdelay]
+        hd = td
+        hm = tm
+        drainsub[hd] = dayrech
+        macsub[hm] = daymrech
+        td = _tail(hd, irdelay)
+        tm = _tail(hm, imdelay)
+        recharge = recharge + (1.0 - frdelay) * drainsub[td]
+        recharge_for_br = recharge_for_br + (1.0 - frdelay) * drainsub[td]
+        drainsub[td] = frdelay * drainsub[td]
+        mrecharge = mrecharge + (1.0 - fmdelay) * macsub[tm]
+        macsub[tm] = fmdelay * macsub[tm]
         rainfall = rainfall + rain[iday]
         potevapn = potevapn + epot[iday]
 
@@ -295,6 +375,8 @@ def _rechmod(p, state, drainsub, macsub, nonconv, iday1, iday2,
             evapn_br = evapn_br + dayevap_br
             potevapn_br = potevapn_br + tepot_br
 
+    heads[0] = hd
+    heads[1] = hm
     state[0] = vol
     state[1] = vol_br
     f[F_RAINFALL] = rainfall
@@ -327,12 +409,14 @@ def _elevation(p, vol, vol_br):
 
 @njit(**_JIT)
 def _simulate_cell(p, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
-                   gwirrigfrac, epot_br, outdays, nstep, mxiter, tol, subdim,
+                   gwirrigfrac, epot_br, outdays, nstep, mxiter, tol,
                    values, nonconv):
     """One cell, the ``lumprem2.f`` driver loop.  See core.simulate.
 
-    ``values`` has one row per output time actually reached, plus day 0, and
-    is filled in place; ``nonconv`` receives the upper and lower counts.
+    ``rbuf`` and ``mbuf`` are the initial buffers, 1-based (index 0 unused)
+    and of any length.  ``values`` has one row per output time actually
+    reached, plus day 0, and is filled in place; ``nonconv`` receives the
+    upper and lower counts.
     """
     numdays = rain.shape[0]
     maxvol_br = p[MAXVOL_BR]
@@ -340,17 +424,24 @@ def _simulate_cell(p, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
     state = np.empty(2)
     state[0] = p[VOL]
     state[1] = p[VOL_BR]
-    drainsub = rbuf.copy()
-    macsub = mbuf.copy()
+    drainsub = np.empty(int(p[RDELAY]) + 1)
+    macsub = np.empty(int(p[MDELAY]) + 1)
+    heads = np.zeros(2, dtype=np.int64)
+    claim = np.empty(2)
+    claim[0] = _fill_ring(rbuf, drainsub.shape[0], drainsub)
+    claim[1] = _fill_ring(mbuf, macsub.shape[0], macsub)
     f = np.empty(NFLUX)
     nonconv[0] = 0
     nonconv[1] = 0
 
+    # Day 0 sums the initial buffers whole, sweep included, as the Fortran
+    # does before its first call.
     totd = 0.0
+    for i in range(1, rbuf.shape[0]):
+        totd = totd + rbuf[i]
     totm = 0.0
-    for i in range(1, subdim + 1):
-        totd = totd + drainsub[i]
-        totm = totm + macsub[i]
+    for i in range(1, mbuf.shape[0]):
+        totm = totm + mbuf[i]
 
     elevation = _elevation(p, state[0], state[1])
     values[0, :] = 0.0
@@ -375,17 +466,14 @@ def _simulate_cell(p, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
             iday2 = numdays
             ifin = 1
 
-        _rechmod(p, state, drainsub, macsub, nonconv, iday1, iday2,
+        _rechmod(p, state, drainsub, macsub, heads, claim, nonconv, iday1, iday2,
                  rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br,
-                 nstep, mxiter, tol, subdim, f)
+                 nstep, mxiter, tol, f)
 
         deltav = state[0] - oldvol
         deltav_br = state[1] - oldvol_br
-        totd = 0.0
-        totm = 0.0
-        for i in range(1, subdim + 1):
-            totd = totd + drainsub[i]
-            totm = totm + macsub[i]
+        totd = _ring_total(drainsub, heads[0])
+        totm = _ring_total(macsub, heads[1])
         if maxvol_br > 0.0:
             allrecharge = f[F_MRECHARGE] + f[F_DRAINAGE_BR] + f[F_OVERFLOW_BR]
         else:
@@ -432,88 +520,64 @@ def _simulate_cell(p, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
             break
 
 
+@njit(**_JIT)
+def _row(a, c):
+    """Cell ``c``'s row of a forcing array that is shared (one row) or per cell."""
+    return a[c] if a.shape[0] > 1 else a[0]
+
+
 @njit(parallel=True, **_JIT)
 def _simulate_cells(params, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
-                    gwirrigfrac, epot_br, outdays, nstep, mxiter, tol, subdim,
+                    gwirrigfrac, epot_br, outdays, nstep, mxiter, tol,
                     values, nonconv):
-    """Independent cells under ``prange``, sharing forcing and solver settings."""
+    """Independent cells under ``prange``, sharing solver settings and schedule.
+
+    Each forcing array is ``(1, ntime)``, shared by every cell, or
+    ``(ncell, ntime)``, one row per cell.
+    """
     for c in prange(params.shape[0]):
-        _simulate_cell(params[c], rbuf[c], mbuf[c], rain, epot, cropfac, gamma,
-                       irrigcode, gwirrigfrac, epot_br, outdays, nstep, mxiter,
-                       tol, subdim, values[c], nonconv[c])
+        _simulate_cell(params[c], rbuf[c], mbuf[c], _row(rain, c), _row(epot, c),
+                       _row(cropfac, c), _row(gamma, c), _row(irrigcode, c),
+                       _row(gwirrigfrac, c), _row(epot_br, c), outdays, nstep,
+                       mxiter, tol, values[c], nonconv[c])
 
 
 # ---------------------------------------------------------------------------
 # Python-side marshalling
 # ---------------------------------------------------------------------------
 
-def _nrows(outdays: np.ndarray, numdays: int) -> int:
-    """Day 0 plus every output time up to the first that reaches the end."""
-    reached = np.flatnonzero(outdays >= numdays)
-    return 1 + (int(reached[0]) + 1 if reached.size else outdays.size)
+def _forcing(rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br, ndim):
+    """Contiguous float64 arrays (int64 for the irrigation code) of ``ndim``."""
+    def fix(a, dtype):
+        a = np.asarray(a, dtype=dtype)
+        return np.ascontiguousarray(a.reshape(1, -1) if ndim == 2 and a.ndim == 1 else a)
 
-
-def param_row(
-    *, maxvol, irrigvolfrac, rdelay, mdelay, ks, m, l, mflowmax,
-    maxvol_br=0.0, extravol_br=0.0, gamma_br=0.0, ks_br=0.0, m_br=0.0, l_br=0.0,
-    offset, factor1, factor2, power, datum, bucket="upper",
-    elevmin=-1.0e20, elevmax=1.0e20, vol, vol_br=0.0,
-) -> np.ndarray:
-    """Pack one cell's parameters into the row layout the kernel reads."""
-    if bucket not in ("upper", "lower"):
-        raise ValueError(f"bucket must be 'upper' or 'lower', got {bucket!r}")
-    if bucket == "lower" and maxvol_br <= 0.0:
-        raise ValueError("bucket='lower' requires maxvol_br > 0")
-    p = np.empty(NPARAM)
-    p[MAXVOL], p[IRRIGVOLFRAC], p[RDELAY], p[MDELAY] = maxvol, irrigvolfrac, rdelay, mdelay
-    p[KS], p[M], p[L], p[MFLOWMAX] = ks, m, l, mflowmax
-    p[MAXVOL_BR], p[EXTRAVOL_BR], p[GAMMA_BR] = maxvol_br, extravol_br, gamma_br
-    p[KS_BR], p[M_BR], p[L_BR] = ks_br, m_br, l_br
-    p[OFFSET], p[FACTOR1], p[FACTOR2], p[POWER] = offset, factor1, factor2, power
-    p[DATUM], p[ELEVMIN], p[ELEVMAX] = datum, elevmin, elevmax
-    p[NBUCKET] = 1.0 if bucket == "upper" else 2.0
-    p[VOL], p[VOL_BR] = vol, vol_br
-    return p
-
-
-def _buffer(values, subdim: int) -> np.ndarray:
-    buf = np.zeros(subdim + 1)
-    values = np.asarray(values, dtype=np.float64)
-    buf[1:1 + values.size] = values
-    return buf
-
-
-def _forcing(rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br):
-    rain = np.ascontiguousarray(rain, dtype=np.float64)
-    epot_br = (np.zeros_like(rain) if epot_br is None
-               else np.ascontiguousarray(epot_br, dtype=np.float64))
-    return (
-        rain,
-        np.ascontiguousarray(epot, dtype=np.float64),
-        np.ascontiguousarray(cropfac, dtype=np.float64),
-        np.ascontiguousarray(gamma, dtype=np.float64),
-        np.ascontiguousarray(irrigcode, dtype=np.int64),
-        np.ascontiguousarray(gwirrigfrac, dtype=np.float64),
-        epot_br,
-    )
+    rain = fix(rain, np.float64)
+    epot_br = np.zeros_like(rain[:1] if ndim == 2 else rain) if epot_br is None \
+        else fix(epot_br, np.float64)
+    out = (rain, fix(epot, np.float64), fix(cropfac, np.float64),
+           fix(gamma, np.float64), fix(irrigcode, np.int64),
+           fix(gwirrigfrac, np.float64), epot_br)
+    for a in out:
+        assert a.ndim == ndim and a.shape[-1] == rain.shape[-1], (a.shape, rain.shape)
+    return out
 
 
 def simulate(
     *, rbuf=(), mbuf=(), nstep, mxiter, tol,
     rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br=None,
-    outdays, subdim: int = MAXDELAY, **params,
+    outdays, **params,
 ) -> Simulation:
     """Drop-in replacement for ``core.simulate``, compiled."""
     p = param_row(**params)
-    forcing = _forcing(rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br)
+    forcing = _forcing(rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br, 1)
     outdays = np.ascontiguousarray(outdays, dtype=np.int64)
-    nrows = _nrows(outdays, forcing[0].size)
-    values = np.empty((nrows, NCOLUMN))
+    n = nrows(outdays, forcing[0].size)
+    values = np.empty((n, NCOLUMN))
     nonconv = np.zeros(2, dtype=np.int64)
-    _simulate_cell(p, _buffer(rbuf, subdim), _buffer(mbuf, subdim), *forcing,
-                   outdays, int(nstep), int(mxiter), float(tol), int(subdim),
-                   values, nonconv)
-    days = np.concatenate(([0], np.minimum(outdays[: nrows - 1], forcing[0].size)))
+    _simulate_cell(p, buffer_rows([rbuf])[0], buffer_rows([mbuf])[0], *forcing,
+                   outdays, int(nstep), int(mxiter), float(tol), values, nonconv)
+    days = np.concatenate(([0], np.minimum(outdays[: n - 1], forcing[0].size)))
     return Simulation(
         days=days.astype(np.int64), values=values,
         nonconverged_upper=int(nonconv[0]), nonconverged_lower=int(nonconv[1]),
@@ -522,26 +586,38 @@ def simulate(
 
 def simulate_cells(
     params: np.ndarray, *, rbuf=None, mbuf=None, nstep, mxiter, tol,
-    rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br=None,
-    outdays, subdim: int = MAXDELAY,
+    rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br=None, outdays,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Run ``params.shape[0]`` independent cells in parallel over shared forcing.
+    """Run ``params.shape[0]`` independent cells in parallel.
 
-    ``params`` is an ``(ncell, NPARAM)`` array of rows from ``param_row``.
-    Returns ``values`` of shape ``(ncell, nrows, 26)`` and the ``(ncell, 2)``
-    non-convergence counts.  A benchmarking primitive for Phase 3, not the
-    ``ModelGrid`` API.
+    ``params`` is an ``(ncell, NPARAM)`` array of rows from ``param_row``, and
+    ``rbuf``/``mbuf`` are ``(ncell, width + 1)`` rows from ``buffer_rows``
+    (empty buffers when omitted).  Each forcing variable is 1-D, or
+    ``(1, ntime)``, when every cell shares it, and ``(ncell, ntime)`` when
+    each has its own.  Returns ``values`` of shape ``(ncell, nrows, 26)`` and
+    the ``(ncell, 2)`` non-convergence counts.  ``engine.run_cells`` is the
+    entry point that also falls back to ``core``.
     """
     params = np.ascontiguousarray(params, dtype=np.float64)
     assert params.ndim == 2 and params.shape[1] == NPARAM, params.shape
     ncell = params.shape[0]
-    forcing = _forcing(rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br)
+    forcing = _forcing(rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br, 2)
+    for a in forcing:
+        assert a.shape[0] in (1, ncell), (a.shape, ncell)
     outdays = np.ascontiguousarray(outdays, dtype=np.int64)
-    nrows = _nrows(outdays, forcing[0].size)
-    rbuf = np.zeros((ncell, subdim + 1)) if rbuf is None else np.ascontiguousarray(rbuf)
-    mbuf = np.zeros((ncell, subdim + 1)) if mbuf is None else np.ascontiguousarray(mbuf)
-    values = np.empty((ncell, nrows, NCOLUMN))
+    n = nrows(outdays, forcing[0].shape[1])
+    empty = np.zeros((ncell, 1))
+    rbuf = empty if rbuf is None else np.ascontiguousarray(rbuf, dtype=np.float64)
+    mbuf = empty if mbuf is None else np.ascontiguousarray(mbuf, dtype=np.float64)
+    assert rbuf.shape[0] == ncell and mbuf.shape[0] == ncell, (rbuf.shape, mbuf.shape)
+    values = np.empty((ncell, n, NCOLUMN))
     nonconv = np.zeros((ncell, 2), dtype=np.int64)
-    _simulate_cells(params, rbuf, mbuf, *forcing, outdays, int(nstep), int(mxiter),
-                    float(tol), int(subdim), values, nonconv)
+    if ncell == 1:
+        # One cell gains nothing from a parallel region but its start-up cost,
+        # which a calibration loop of single runs would pay every time.
+        _simulate_cell(params[0], rbuf[0], mbuf[0], *(a[0] for a in forcing), outdays,
+                       int(nstep), int(mxiter), float(tol), values[0], nonconv[0])
+    else:
+        _simulate_cells(params, rbuf, mbuf, *forcing, outdays, int(nstep), int(mxiter),
+                        float(tol), values, nonconv)
     return values, nonconv

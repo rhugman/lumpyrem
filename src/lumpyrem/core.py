@@ -13,14 +13,17 @@ and sequences in, arrays out.  The designed API arrives in Phase 2.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from math import exp
 
 import numpy as np
 
-# lumprem2.f: parameter(MAXDELAY=500).  Phase 3 replaces the shifted buffers
-# with ring buffers sized to the actual delay; Phase 1 keeps the literal form.
-MAXDELAY = 500
+# lumprem2.f: parameter(MAXDELAY=500) fixes the length of both delay buffers,
+# and with it the longest delay the model can carry.  Here the length is chosen
+# per run instead (``buffer_length``): the translation below is otherwise
+# unchanged, because every element past the longest delay is zero after the
+# first call, and adding zeros is exact.  The compiled kernel goes further and
+# holds each buffer as a ring of exactly the delay's length.
 
 # lumprem2.f floors the volume at `1.0e-10` before raising it to `power`, so a
 # negative power cannot blow up.  That literal is a *default REAL* -- single
@@ -87,12 +90,14 @@ class State:
 
     The delay buffers are 1-based to match the Fortran, so index 0 is unused
     and every subscript in the translation below reads the same as its source.
+    Both hold ``subdim + 1`` elements, where ``subdim`` is the run's
+    :func:`buffer_length`.
     """
 
     vol: float
+    drainsub: list[float]
+    macsub: list[float]
     vol_br: float = 0.0
-    drainsub: list[float] = field(default_factory=lambda: [0.0] * (MAXDELAY + 1))
-    macsub: list[float] = field(default_factory=lambda: [0.0] * (MAXDELAY + 1))
     nonconverged_upper: int = 0
     nonconverged_lower: int = 0
 
@@ -146,7 +151,7 @@ def rechmod(
     l_br: float = 0.0,
     gamma_br: float = 0.0,
     epot_br=None,
-    subdim: int = MAXDELAY,
+    subdim: int,
 ) -> Fluxes:
     """Advance ``state`` over ``len(rain)`` days.  Direct port of ``rechmod2.f``.
 
@@ -412,6 +417,16 @@ def _elevation(vol, vol_br, maxvol, maxvol_br, nbucket,
     return elevation
 
 
+def buffer_length(rdelay: float, mdelay: float, rbuf=(), mbuf=()) -> int:
+    """The Fortran's ``MAXDELAY``, chosen for one run.
+
+    Long enough for both delays (``int(delay) + 1`` elements each, trap 7) and
+    for everything the initial buffers hold, so that water sitting beyond a
+    delay is still there for the first call's sweep to claim.
+    """
+    return max(int(rdelay) + 1, int(mdelay) + 1, len(rbuf), len(mbuf))
+
+
 def simulate(
     *,
     # -- upper store
@@ -458,7 +473,6 @@ def simulate(
     epot_br=None,
     # -- output times, 1-based simulation days
     outdays,
-    subdim: int = MAXDELAY,
 ) -> Simulation:
     """Run LUMPREM2 over dense daily forcing.  Port of the ``lumprem2.f`` loop.
 
@@ -473,7 +487,9 @@ def simulate(
         raise ValueError("bucket='lower' requires maxvol_br > 0")
     nbucket = 1 if bucket == "upper" else 2
 
-    state = State(vol=float(vol), vol_br=float(vol_br))
+    subdim = buffer_length(rdelay, mdelay, rbuf, mbuf)
+    state = State(vol=float(vol), vol_br=float(vol_br),
+                  drainsub=[0.0] * (subdim + 1), macsub=[0.0] * (subdim + 1))
     for i, value in enumerate(rbuf, start=1):
         state.drainsub[i] = float(value)
     for i, value in enumerate(mbuf, start=1):

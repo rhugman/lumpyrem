@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-__all__ = ["Fill", "Forcing", "VARIABLES", "FORTRAN_FILL", "ForcingError"]
+__all__ = ["Fill", "Forcing", "GridForcing", "VARIABLES", "FORTRAN_FILL", "ForcingError"]
 
 
 class Fill(str, Enum):
@@ -298,21 +298,7 @@ class Forcing:
         Returns:
             One float64 array per variable, each of length ``(end - start).days + 1``.
         """
-        first, last = self.span
-        start = first if start is None else pd.Timestamp(start)
-        end = last if end is None else pd.Timestamp(end)
-        if start != start.normalize() or end != end.normalize():
-            raise ForcingError("start and end must fall on midnight")
-        if end < start:
-            raise ForcingError(f"end {end.date()} precedes start {start.date()}")
-
-        days = pd.date_range(start, end, freq="D")
-        missing = [v for v in need if v not in self.provided() and v not in DEFAULTS]
-        if missing:
-            raise ForcingError(
-                f"forcing is missing {missing}; supply each as a series or a number"
-            )
-
+        days = _daily_window(self, start, end, need)
         out: dict[str, np.ndarray] = {}
         for name in VARIABLES:
             if name in self.constants:
@@ -326,33 +312,211 @@ class Forcing:
 
 
 # ---------------------------------------------------------------------------
+# Per-cell forcing
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True, eq=False)
+class GridForcing:
+    """Forcing that differs from cell to cell, for a :class:`~lumpyrem.ModelGrid`.
+
+    Each variable is one of three things: an ``(ntime, ncell)`` block, one
+    column per cell; a series of length ``ntime`` shared by every cell; or a
+    plain number.  Variable names, defaults and fill rules are exactly those
+    of :class:`Forcing`, applied to each cell's column, and a NaN means "not
+    listed on this day" as it does there.
+
+    Build one with :meth:`from_arrays`, or read an xarray Dataset with
+    :func:`lumpyrem.io.forcing_from_dataset`.  A grid whose cells all share
+    their forcing takes a plain :class:`Forcing` instead.
+
+    ``cells`` optionally labels the columns.  A grid given labelled forcing
+    insists the labels match its own cell names, in order, so that forcing
+    read from a file cannot be silently applied to the wrong cells.
+    """
+
+    index: pd.DatetimeIndex
+    ncell: int
+    blocks: dict[str, np.ndarray]
+    series: dict[str, np.ndarray]
+    constants: dict[str, float]
+    fill: dict[str, Fill]
+    cells: tuple | None = None
+
+    @classmethod
+    def from_arrays(cls, time, *, freq: str = "D",
+                    fill: Mapping[str, str | Fill] | None = None,
+                    cells=None, **variables) -> GridForcing:
+        """Build from arrays whose first axis is time.
+
+        Args:
+            time: the date of the first row, or a sequence of one date per row.
+            freq: spacing of the rows when ``time`` is a single date.
+            fill: per-variable overrides of :data:`FORTRAN_FILL`.
+            cells: labels for the columns, or ``None``.
+            **variables: ``(ntime, ncell)`` blocks, ``(ntime,)`` shared
+                series, or numbers.
+        """
+        unknown = [k for k in variables if k not in VARIABLES]
+        if unknown:
+            raise ForcingError(
+                f"unknown forcing variable(s) {unknown}; known names are {list(VARIABLES)}"
+            )
+        blocks, series, constants = {}, {}, {}
+        for name, value in variables.items():
+            arr = np.asarray(value, dtype=np.float64)
+            if arr.ndim == 0:
+                constants[name] = value
+            elif arr.ndim == 1:
+                series[name] = arr
+            elif arr.ndim == 2:
+                blocks[name] = arr
+            else:
+                raise ForcingError(f"{name}: expected (ntime, ncell), (ntime,) or a "
+                                   f"number; got shape {arr.shape}")
+        if not blocks:
+            raise ForcingError("GridForcing needs at least one (ntime, ncell) block; "
+                               "forcing every cell shares is a plain Forcing")
+        ncells = {b.shape[1] for b in blocks.values()}
+        if len(ncells) > 1:
+            raise ForcingError("blocks disagree on the number of cells: " + ", ".join(
+                f"{k}={v.shape[1]}" for k, v in sorted(blocks.items())))
+        lengths = {len(a) for a in (*blocks.values(), *series.values())}
+        if len(lengths) > 1:
+            raise ForcingError("arrays disagree on the number of times: " + ", ".join(
+                f"{k}={len(v)}" for k, v in sorted({**blocks, **series}.items())))
+        ntime = lengths.pop()
+
+        if np.ndim(time) == 0:
+            index = _day_index(pd.date_range(pd.Timestamp(time), periods=ntime, freq=freq))
+        else:
+            index = _day_index(time)
+            if len(index) != ntime:
+                raise ForcingError(f"{len(index)} dates for {ntime} rows")
+        if index.has_duplicates:
+            raise ForcingError(f"duplicate forcing date {index[index.duplicated()][0]}")
+        ncell = ncells.pop()
+        if cells is not None:
+            cells = tuple(cells)
+            if len(cells) != ncell:
+                raise ForcingError(f"{len(cells)} cell labels for {ncell} columns")
+        order = np.argsort(index.asi8, kind="stable")
+        return cls(index=index[order], ncell=ncell, cells=cells,
+                   blocks={k: np.ascontiguousarray(v[order]) for k, v in blocks.items()},
+                   series={k: v[order] for k, v in series.items()},
+                   constants=_check_constants(constants),
+                   fill=_resolve_fill(fill))
+
+    @property
+    def span(self) -> tuple[pd.Timestamp, pd.Timestamp]:
+        """First and last listed date."""
+        if len(self.index) == 0:
+            raise ForcingError("forcing carries no dates")
+        return self.index[0], self.index[-1]
+
+    def provided(self) -> set[str]:
+        """Variables supplied, as a block, a series or a constant."""
+        return set(self.blocks) | set(self.series) | set(self.constants)
+
+    def to_daily(self, start=None, end=None, *,
+                 need: Sequence[str] = _REQUIRED) -> dict[str, np.ndarray]:
+        """Resolve onto one value per day over ``[start, end]``.
+
+        Returns one float64 array per variable: ``(ndays, ncell)`` for a
+        block, ``(ndays,)`` for anything every cell shares.
+        """
+        days = _daily_window(self, start, end, need)
+        out: dict[str, np.ndarray] = {}
+        for name in VARIABLES:
+            if name in self.constants:
+                out[name] = np.full(len(days), float(self.constants[name]))
+            elif name in self.blocks:
+                out[name] = _expand_block(name, self.index, self.blocks[name], days,
+                                          self.fill[name])
+            elif name in self.series:
+                out[name] = _expand(name, pd.Series(self.series[name], index=self.index),
+                                    days, self.fill[name])
+            else:
+                out[name] = np.full(len(days), DEFAULTS[name])
+        _validate(out)
+        return out
+
+
+def _daily_window(forcing: Forcing | GridForcing, start, end,
+                  need: Sequence[str]) -> pd.DatetimeIndex:
+    """The days ``to_daily`` resolves onto, once the request is known to be
+    answerable: whole days, in order, with every needed variable available."""
+    first, last = forcing.span
+    start = first if start is None else pd.Timestamp(start)
+    end = last if end is None else pd.Timestamp(end)
+    if start != start.normalize() or end != end.normalize():
+        raise ForcingError("start and end must fall on midnight")
+    if end < start:
+        raise ForcingError(f"end {end.date()} precedes start {start.date()}")
+    missing = [v for v in need if v not in forcing.provided() and v not in DEFAULTS]
+    if missing:
+        raise ForcingError(
+            f"forcing is missing {missing}; supply each as a series or a number"
+        )
+    return pd.date_range(start, end, freq="D")
+
+
+# ---------------------------------------------------------------------------
 # Rules
 # ---------------------------------------------------------------------------
 
 def _expand(name: str, series: pd.Series, days: pd.DatetimeIndex, rule: Fill) -> np.ndarray:
-    """Apply one fill rule.  Day numbers are 1-based, as in the Fortran."""
+    """Apply one fill rule to one series, whose NaNs mean "not listed"."""
     listed = series.dropna()
-    if listed.empty:
+    return _fill_listed(name, listed.index, listed.to_numpy(dtype=np.float64), days, rule)
+
+
+def _expand_block(name: str, index: pd.DatetimeIndex, block: np.ndarray,
+                  days: pd.DatetimeIndex, rule: Fill) -> np.ndarray:
+    """Apply one fill rule to each column of an ``(ntime, ncell)`` block.
+
+    Where every cell lists the same days the rule is applied to all columns
+    at once -- the same element-wise arithmetic, so each column comes out as
+    it would alone.  Cells that list different days are filled one by one.
+    """
+    nan = np.isnan(block)
+    keep = ~nan.all(axis=1)
+    if not nan[keep].any():
+        return _fill_listed(name, index[keep], block[keep], days, rule)
+    out = np.empty((len(days), block.shape[1]))
+    for c in range(block.shape[1]):
+        out[:, c] = _expand(f"{name} (cell {c})", pd.Series(block[:, c], index=index),
+                            days, rule)
+    return out
+
+
+def _fill_listed(name: str, listed: pd.DatetimeIndex, values: np.ndarray,
+                 days: pd.DatetimeIndex, rule: Fill) -> np.ndarray:
+    """Apply one fill rule.  Day numbers are 1-based, as in the Fortran.
+
+    ``values`` is ``(nlisted,)``, or ``(nlisted, ncell)`` for cells listing the
+    same days; the result has ``len(days)`` rows either way.
+    """
+    if len(listed) == 0:
         raise ForcingError(f"{name}: no values listed")
 
     # Day numbers relative to the run, so a value listed before the run starts
     # is a negative day and still anchors a forward fill or an interpolation.
     start = days[0]
-    listed_days = ((listed.index - start) // _DAY).to_numpy().astype(np.float64) + 1.0
-    values = listed.to_numpy(dtype=np.float64)
+    listed_days = ((listed - start) // _DAY).to_numpy().astype(np.float64) + 1.0
     target = np.arange(1.0, len(days) + 1.0)
+    shape = (len(days),) + values.shape[1:]
 
     if rule is Fill.ZERO:
-        out = np.zeros(len(days))
+        out = np.zeros(shape)
         inside = (listed_days >= 1.0) & (listed_days <= len(days))
         out[listed_days[inside].astype(np.int64) - 1] = values[inside]
         return out
 
     if rule is Fill.DENSE:
-        out = np.full(len(days), np.nan)
+        out = np.full(shape, np.nan)
         inside = (listed_days >= 1.0) & (listed_days <= len(days))
         out[listed_days[inside].astype(np.int64) - 1] = values[inside]
-        gap = np.isnan(out)
+        gap = np.isnan(out).reshape(len(days), -1).any(axis=1)
         if gap.any():
             first = days[int(np.argmax(gap))]
             raise ForcingError(
@@ -366,7 +530,7 @@ def _expand(name: str, series: pd.Series, days: pd.DatetimeIndex, rule: Fill) ->
             raise ForcingError(
                 f"{name}: fill='forward' has nothing to carry forward onto "
                 f"{days[0].date()} -- the first listed value is "
-                f"{listed.index[0].date()}. List a value at or before the run "
+                f"{listed[0].date()}. List a value at or before the run "
                 f"starts, or choose a different fill rule."
             )
         # searchsorted with side='right' gives, for each day, the index of the
@@ -380,12 +544,12 @@ def _expand(name: str, series: pd.Series, days: pd.DatetimeIndex, rule: Fill) ->
         # cannot reach it for a run longer than a day, because it separately
         # insists the last listed day reach the end of the simulation.
         if len(values) == 1:
-            return np.full(len(days), values[0])
+            return np.broadcast_to(values[0], shape).copy()
         if listed_days[0] > 1.0 or listed_days[-1] < float(len(days)):
             raise ForcingError(
                 f"{name}: fill='interpolate' needs listed values on or outside "
                 f"both ends of the run ({days[0].date()} to {days[-1].date()}); "
-                f"it has {listed.index[0].date()} to {listed.index[-1].date()}. "
+                f"it has {listed[0].date()} to {listed[-1].date()}. "
                 f"Extend the series, or choose a different fill rule."
             )
         # lumprem2.f computes the reciprocal of the gap once and multiplies by
@@ -395,7 +559,7 @@ def _expand(name: str, series: pd.Series, days: pd.DatetimeIndex, rule: Fill) ->
                       0, len(values) - 2)
         d1 = listed_days[seg]
         iddiff = 1.0 / (listed_days[seg + 1] - d1)
-        dfac = (target - d1) * iddiff
+        dfac = ((target - d1) * iddiff).reshape((-1,) + (1,) * (values.ndim - 1))
         out = values[seg] + (values[seg + 1] - values[seg]) * dfac
         return out
 
@@ -428,39 +592,44 @@ def _check_constants(constants: Mapping[str, object]) -> dict[str, float]:
     return out
 
 
-def _validate(daily: Mapping[str, np.ndarray]) -> None:
-    """Reject forcing the physics cannot take, naming the day that broke it."""
-    def _first_bad(mask: np.ndarray) -> int:
-        return int(np.argmax(mask))
+def _first_bad(arr: np.ndarray, mask: np.ndarray) -> str:
+    """Where the first offending value sits, and what it is."""
+    if arr.ndim == 1:
+        i = int(np.argmax(mask))
+        return f"day {i + 1} is {arr[i]!r}"
+    i, c = np.unravel_index(int(np.argmax(mask)), mask.shape)
+    return f"day {i + 1}, cell {c} is {arr[i, c]!r}"
 
+
+def _validate(daily: Mapping[str, np.ndarray]) -> None:
+    """Reject forcing the physics cannot take, naming the day that broke it.
+
+    Arrays are ``(ndays,)``, or ``(ndays, ncell)`` for per-cell forcing, in
+    which case the cell is named too.
+    """
     for name in ("rainfall", "pot_evap", "crop_factor", "pot_evap_lower"):
         bad = daily[name] < 0.0
         if bad.any():
-            i = _first_bad(bad)
-            raise ForcingError(f"{name} must be >= 0; day {i + 1} is {daily[name][i]!r}")
+            raise ForcingError(f"{name} must be >= 0; {_first_bad(daily[name], bad)}")
     bad = ~(daily["veg_gamma"] > 0.0)
     if bad.any():
-        i = _first_bad(bad)
         raise ForcingError(
             f"veg_gamma must be > 0 -- the evaporation curve is 0/0 at zero, "
             f"where lumprem2.f returns a NaN without saying so; "
-            f"day {i + 1} is {daily['veg_gamma'][i]!r}"
+            f"{_first_bad(daily['veg_gamma'], bad)}"
         )
     frac = daily["gw_irrig_frac"]
     bad = (frac < 0.0) | (frac > 1.0)
     if bad.any():
-        i = _first_bad(bad)
-        raise ForcingError(f"gw_irrig_frac must be in [0, 1]; day {i + 1} is {frac[i]!r}")
+        raise ForcingError(f"gw_irrig_frac must be in [0, 1]; {_first_bad(frac, bad)}")
     code = daily["irrigate"]
     bad = (code != 0.0) & (code != 1.0)
     if bad.any():
-        i = _first_bad(bad)
         raise ForcingError(
-            f"irrigate must be 0 or 1; day {i + 1} is {code[i]!r}. A fractional "
+            f"irrigate must be 0 or 1; {_first_bad(code, bad)}. A fractional "
             f"value usually means an interpolating fill rule was applied to it."
         )
     for name, arr in daily.items():
         bad = ~np.isfinite(arr)
         if bad.any():
-            i = _first_bad(bad)
-            raise ForcingError(f"{name} is not finite on day {i + 1}: {arr[i]!r}")
+            raise ForcingError(f"{name} is not finite: {_first_bad(arr, bad)}")

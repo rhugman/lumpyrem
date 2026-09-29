@@ -20,7 +20,7 @@ from kernel_compare import run_case_through
 
 compiled = pytest.importorskip("lumpyrem.compiled", reason="numba not installed")
 
-from lumpyrem import core  # noqa: E402
+from lumpyrem import core, engine  # noqa: E402
 from lumpyrem.core import COLUMNS  # noqa: E402
 
 
@@ -74,9 +74,9 @@ def test_grid_reproduces_single_runs(frozen_cases):
     solver = dict(nstep=lead.nstep, mxiter=lead.mxiter, tol=lead.tol,
                   outdays=lead.outdays)
 
-    params = np.stack([compiled.param_row(**_param_kwargs(c)) for c in shared])
-    rbuf = np.stack([compiled._buffer(c.rbuf, core.MAXDELAY) for c in shared])
-    mbuf = np.stack([compiled._buffer(c.mbuf, core.MAXDELAY) for c in shared])
+    params = np.stack([engine.param_row(**_param_kwargs(c)) for c in shared])
+    rbuf = engine.buffer_rows([c.rbuf for c in shared])
+    mbuf = engine.buffer_rows([c.mbuf for c in shared])
     grid, nonconv = compiled.simulate_cells(params, rbuf=rbuf, mbuf=mbuf,
                                             **forcing, **solver)
 
@@ -89,12 +89,12 @@ def test_grid_reproduces_single_runs(frozen_cases):
 
 def test_grid_of_identical_cells_is_uniform(frozen_cases):
     case = next(c for c in frozen_cases if c.two_store)
-    row = compiled.param_row(**_param_kwargs(case))
+    row = engine.param_row(**_param_kwargs(case))
     forcing = dict(rain=case.rain, epot=case.epot, cropfac=case.cropfac,
                    gamma=case.gamma, irrigcode=case.irrigcode,
                    gwirrigfrac=case.gwirrigfrac, epot_br=case.epot_br)
-    rbuf = np.tile(compiled._buffer(case.rbuf, core.MAXDELAY), (33, 1))
-    mbuf = np.tile(compiled._buffer(case.mbuf, core.MAXDELAY), (33, 1))
+    rbuf = engine.buffer_rows([case.rbuf] * 33)
+    mbuf = engine.buffer_rows([case.mbuf] * 33)
     grid, _ = compiled.simulate_cells(np.tile(row, (33, 1)), rbuf=rbuf, mbuf=mbuf,
                                       **forcing, nstep=case.nstep, mxiter=case.mxiter,
                                       tol=case.tol, outdays=case.outdays)
