@@ -18,6 +18,8 @@ fast = ["numba>=0.60", "numpy<2.4"]
 plot = ["matplotlib>=3.7"]
 # lumpyrem.io: gridded forcing and results as xarray Datasets and netCDF.
 xarray = ["xarray>=2024.6", "netCDF4>=1.6"]
+# The example notebooks.
+examples = ["matplotlib>=3.7", "xarray>=2024.6", "netCDF4>=1.6", "jupyterlab"]
 test = ["pytest>=7", "matplotlib>=3.7", "xarray>=2024.6", "netCDF4>=1.6"]
 dev = ["pytest>=7", "ruff>=0.6", "matplotlib>=3.7", "xarray>=2024.6", "netCDF4>=1.6"]
 
@@ -32,7 +34,7 @@ markers = ["oracle: requires gfortran to build the reference implementation"]
 
 [tool.ruff]
 line-length = 100
-src = ["src", "tests", "scripts"]
+src = ["src", "tests", "scripts", "examples"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "NPY"]

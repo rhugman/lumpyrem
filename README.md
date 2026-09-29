@@ -59,6 +59,17 @@ writes results to it.
 pip install "lumpyrem[fast,xarray]"
 ```
 
+### Examples
+
+Three notebooks in [`examples/`](examples/README.md) go from one site to a
+synthetic valley of 2,400 cells: parameters mapped from soil and land-use
+tables, then per-cell rainfall, crop calendars and irrigation districts read
+from netCDF, with results returned as gridded maps.
+
+```bash
+pip install -e ".[fast,examples]"
+```
+
 ### Gap-filling is a choice, not a file format
 
 `lumprem2.f` fills gaps in its forcing by three different rules, decided by
