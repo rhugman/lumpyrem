@@ -162,8 +162,8 @@ speed per core, multiplied by core count.
 > **Benchmarked at the start of Phase 3 — it holds.** On the same ten-year,
 > five-substep workload, the compiled kernel runs at **0.94–0.97x the time of
 > `rechmod2.f`** per cell on one core (M4 Max, gfortran `-O2`), returns a
-> checksum identical to the Fortran's, and reaches **~10x on the 12
-> performance cores**. The 20 ms figure above is the whole executable
+> checksum identical to the Fortran's, and scales near-linearly: **7.05x on 8
+> cores**, 8.6x on 12 under residual load (Phase 3 notes). The 20 ms figure above is the whole executable
 > including file I/O; `scripts/benchmark_numba.py` calls `rechmod` from a small
 > Fortran harness instead, which puts the reference at 5.2 ms (one store) and
 > 9.7 ms (two stores), and times Numba against that.
@@ -332,9 +332,9 @@ benchmarking Numba, because the whole design rests on it.
 
 > **Gate** — An *N*-cell run with identical parameters matches *N* single runs
 > exactly; per-cell time <= Fortran; scaling is near-linear to physical core
-> count. **Correctness and per-cell time: met. Scaling: met at ~85% on 12
-> cores as first measured, but under heavy load; to be re-measured on a quiet
-> machine before it is quoted.**
+> count. **Correctness and per-cell time: met. Scaling: met to 8 cores —
+> 7.05x at 88% efficiency — in the quietest run so far; the 12-core figure
+> stays provisional until a run at a load average below ~1.**
 
 *As built:*
 
@@ -435,15 +435,31 @@ benchmarking Numba, because the whole design rests on it.
   the 209 cases, and none by crashing; the summation-order mutation alone moves
   88. Traps 4 and 6 remain provably inert in the compiled build too.
 
-- **Near-linear scaling: provisionally met.** First measured at 2048 cells:
-  3.8x on 4 threads, 7.4x on 8, 10.2x on 12 (85% efficiency), 11.7x on 16,
-  where the four efficiency cores join — *with the machine at a load average
-  of ~65*. Re-run after the ring buffers at a load of 7–11: 0.90–0.91x Fortran
-  per cell, checksums exact, and 6.6x on 12 threads, which says more about the
-  load than the kernel. The Fortran/Numba ratio is protected by alternating the
-  two; absolute times and scaling are not, and still need a quiet machine.
-  Cells with a ±20% parameter spread vary in cost, and `prange`'s static
-  chunking loses a few percent to that.
+- **Near-linear scaling: met to 8 cores.** The quietest run so far, after the
+  ring buffers, at a load average of ~6 on the M4 Max (12 performance and 4
+  efficiency cores), 2048 cells with a ±20% parameter spread:
+
+  | threads | speedup | efficiency |
+  |---:|---:|---:|
+  | 2 | 2.00x | 100% |
+  | 4 | 3.98x | 100% |
+  | 6 | 5.55x | 92% |
+  | 8 | 7.05x | 88% |
+  | 10 | 7.89x | 79% |
+  | 12 | 8.62x | 72% |
+  | 16 | 9.23x | 58% |
+
+  Per cell on one thread, 0.92x Fortran (one store) and 0.90x (two stores),
+  checksums exact. Scaling is linear to 4 threads and near-linear to 8. The
+  fall beyond ~10 fits the load: about six cores were busy with other work,
+  so threads past that share cores with it, and at 16 the four efficiency
+  cores join as well. That is consistent with the kernel scaling cleanly but
+  does not prove it, so the 12-core figure stays provisional until a run at a
+  load below ~1. The first measurement, 10.2x on 12 threads at a reported load
+  of ~65, is higher than this one taken under far less load, so that load
+  reading probably overstated what was competing for cores, and the figure is
+  not relied on. Cells with a ±20% parameter spread vary in cost, and
+  `prange`'s static chunking loses a few percent to that.
 
 ### Phase 4 — MODFLOW and PEST coupling (1 week)
 
@@ -613,7 +629,7 @@ scoped around them rather than waived.
 It was the load-bearing assumption of Phase 3. *Settled in Phase 3's first
 step:* with `numpy<2.4` pinned by the `fast` extra, the compiled kernel is
 bit-identical to the reference, at or slightly under Fortran time per cell, and
-scales to ~10x on 12 cores; see the Phase 3 notes. Cython and Rust are no
+scales near-linearly, 7.05x on 8 cores; see the Phase 3 notes. Cython and Rust are no
 longer needed as fallbacks. What remains is the pin itself: `fast` holds NumPy
 at 2.3 until Numba supports 2.4, and CI installs it so the compiled kernel is
 gated on all three platforms rather than skipped.
