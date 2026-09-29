@@ -275,15 +275,19 @@ class GridResults:
                          index=pd.Index(self.cells, name="cell"), name="balance_error")
 
     # ------------------------------------------------------------------
-    def to_xarray(self):
-        """An xarray Dataset on ``(time, cell)``, one variable per column."""
-        from .io import to_dataset
-        return to_dataset(self)
+    def to_xarray(self, *, cell_levels=None):
+        """An xarray Dataset on ``(time, cell)``, one variable per column.
 
-    def to_netcdf(self, path, **kwargs):
+        Tuple cell labels become a MultiIndex with levels named by
+        ``cell_levels``; see :func:`lumpyrem.io.to_dataset`.
+        """
+        from .io import to_dataset
+        return to_dataset(self, cell_levels=cell_levels)
+
+    def to_netcdf(self, path, *, cell_levels=None, **kwargs):
         """Write :meth:`to_xarray` to netCDF.  Extra arguments go to xarray."""
         from .io import to_netcdf
-        return to_netcdf(self, path, **kwargs)
+        return to_netcdf(self, path, cell_levels=cell_levels, **kwargs)
 
     def __repr__(self) -> str:
         failed = len(self.nonconverged_cells)

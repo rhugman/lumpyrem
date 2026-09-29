@@ -119,3 +119,51 @@ def test_a_per_cell_constant_is_broadcast_over_time(grid_run):
     daily = io.forcing_from_dataset(ds).to_daily()
     assert daily["crop_factor"].shape == (len(forcing.index), 4)
     assert (daily["crop_factor"] == [1.0, 0.9, 0.8, 0.7]).all()
+
+
+@pytest.fixture
+def stacked_run():
+    """Forcing on (time, y, x), stacked so that ``cell`` is a (y, x) MultiIndex."""
+    days = pd.date_range(EPOCH, periods=200, name="time")
+    rng = np.random.default_rng(7)
+    rain = np.where(rng.random((200, 2, 3)) < 0.3, rng.exponential(6.0, (200, 2, 3)), 0.0)
+    ds = xr.Dataset({"rainfall": (("time", "y", "x"), rain),
+                     "pot_evap": ("time", np.full(200, 2.5)), "veg_gamma": 5.0},
+                    coords={"time": days, "y": [125.0, 375.0], "x": [0.0, 250.0, 500.0]})
+    forcing = io.forcing_from_dataset(ds.stack(cell=("y", "x")))
+    grid = ModelGrid.from_arrays(upper=dict(GOOD, maxvol=40.0), names=forcing.cells)
+    return ds, forcing, grid.run(forcing, times="MS")
+
+
+def test_tuple_cell_labels_become_a_multiindex_that_unstacks(stacked_run):
+    ds, forcing, res = stacked_run
+    assert forcing.cells[1] == (125.0, 250.0)
+    out = res.to_xarray(cell_levels=("y", "x"))
+    assert isinstance(out.indexes["cell"], pd.MultiIndex)
+    maps = out.unstack("cell")
+    assert maps["total_rech"].dims == ("time", "y", "x")
+    assert maps["y"].values.tolist() == ds["y"].values.tolist()
+    assert maps["total_rech"].sel(y=375.0, x=0.0).values.tolist() == \
+        res.cell((375.0, 0.0)).column("total_rech").tolist()
+    assert list(res.to_xarray().indexes["cell"].names) == ["cell_level_0", "cell_level_1"]
+
+
+def test_a_multiindex_is_written_to_netcdf_as_its_levels(stacked_run, tmp_path):
+    _, _, res = stacked_run
+    path = tmp_path / "grid.nc"
+    res.to_netcdf(path, cell_levels=("y", "x"))
+    with xr.open_dataset(path) as back:
+        back = back.load()
+    assert "cell" not in back.coords and back["y"].dims == ("cell",)
+    again = back.set_index(cell=["y", "x"])
+    assert again.indexes["cell"].tolist() == list(res.cells)
+    assert np.array_equal(again["total_rech"].values, res.column("total_rech"))
+
+
+def test_cell_levels_must_fit_the_labels(stacked_run, grid_run):
+    _, _, res = stacked_run
+    with pytest.raises(ValueError, match="does not match"):
+        res.to_xarray(cell_levels=("layer", "row", "col"))
+    _, _, plain = grid_run
+    with pytest.raises(ValueError, match="not tuples"):
+        plain.to_xarray(cell_levels=("y", "x"))

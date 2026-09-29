@@ -11,6 +11,12 @@ Results keep their own conventions (``lumpyrem.results``): ``time`` labels the
 *end* of each reporting interval, flux variables are totals over the interval
 ending there, and the first row is the initial state.
 
+Cell labels that are tuples -- ``(y, x)`` from forcing stacked with
+``ds.stack(cell=("y", "x"))``, or ``(row, col)`` names given to a grid -- become
+a MultiIndex on ``cell``, so ``.unstack("cell")`` puts the results back on the
+grid.  netCDF cannot store a MultiIndex, so :func:`to_netcdf` writes its levels
+as plain coordinates on ``cell``; ``.set_index(cell=[...])`` rebuilds it.
+
 Plain CSV and DataFrame input and output stay on the objects themselves, as
 :meth:`Forcing.from_csv <lumpyrem.forcing.Forcing.from_csv>` and
 :meth:`Results.to_csv <lumpyrem.results.Results.to_csv>`.
@@ -18,7 +24,7 @@ Plain CSV and DataFrame input and output stay on the objects themselves, as
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -50,12 +56,17 @@ def _xarray():
 # Results out
 # ---------------------------------------------------------------------------
 
-def to_dataset(results: GridResults | Results):
+def to_dataset(results: GridResults | Results, *,
+               cell_levels: Sequence[str] | None = None):
     """Results as an xarray Dataset, one variable per column.
 
     A :class:`~lumpyrem.results.GridResults` gives variables on
     ``(time, cell)`` with per-cell convergence counts alongside; a single
     :class:`~lumpyrem.results.Results` gives variables on ``time`` alone.
+
+    When every cell label is a tuple, ``cell`` is a MultiIndex whose levels
+    are named by ``cell_levels``, ``("y", "x")`` say, or ``cell_level_0``,
+    ``cell_level_1``, ... by default.
     """
     xr = _xarray()
     grid = isinstance(results, GridResults)
@@ -72,7 +83,6 @@ def to_dataset(results: GridResults | Results):
                            "first row is the initial state",
     }
     if grid:
-        coords["cell"] = list(results.cells)
         data_vars["nonconverged_upper"] = ("cell", results.nonconverged[:, 0])
         data_vars["nonconverged_lower"] = ("cell", results.nonconverged[:, 1])
         data_vars["has_elevation"] = ("cell", results.has_elevation.astype(bool))
@@ -80,12 +90,44 @@ def to_dataset(results: GridResults | Results):
         attrs["nonconverged_upper"] = results.nonconverged_upper
         attrs["nonconverged_lower"] = results.nonconverged_lower
         attrs["has_elevation"] = int(results.has_elevation)
-    return xr.Dataset(data_vars=data_vars, coords=coords, attrs=attrs)
+        if cell_levels is not None:
+            raise ValueError("cell_levels applies only to GridResults")
+    ds = xr.Dataset(data_vars=data_vars, coords=coords, attrs=attrs)
+    if grid:
+        ds = ds.assign_coords(_cell_coords(xr, results.cells, cell_levels))
+    return ds
 
 
-def to_netcdf(results: GridResults | Results, path, **kwargs):
-    """Write :func:`to_dataset` to a netCDF file.  Extra arguments go to xarray."""
-    return to_dataset(results).to_netcdf(path, **kwargs)
+def to_netcdf(results: GridResults | Results, path, *,
+              cell_levels: Sequence[str] | None = None, **kwargs):
+    """Write :func:`to_dataset` to a netCDF file.  Extra arguments go to xarray.
+
+    A MultiIndex on ``cell`` is written as its levels, plain coordinates on
+    ``cell``, since netCDF cannot store the index itself.
+    """
+    ds = to_dataset(results, cell_levels=cell_levels)
+    if isinstance(ds.indexes.get("cell"), pd.MultiIndex):
+        ds = ds.reset_index("cell")
+    return ds.to_netcdf(path, **kwargs)
+
+
+def _cell_coords(xr, cells: tuple, levels: Sequence[str] | None):
+    """The ``cell`` coordinate: a MultiIndex when every label is a tuple."""
+    ntuple = sum(isinstance(c, tuple) for c in cells)
+    if ntuple == 0:
+        if levels is not None:
+            raise ValueError("cell_levels names the parts of tuple cell labels, "
+                             "but these labels are not tuples")
+        return {"cell": list(cells)}
+    widths = {len(c) for c in cells if isinstance(c, tuple)}
+    if ntuple < len(cells) or len(widths) > 1:
+        raise ValueError("cell labels must be all tuples of one length, or no tuples "
+                         f"at all; got {cells[:3]} ...")
+    if levels is not None and len(levels) != widths.pop():
+        raise ValueError(f"cell_levels {tuple(levels)} does not match cell labels "
+                         f"such as {cells[0]}")
+    index = pd.MultiIndex.from_tuples(cells, names=levels)
+    return xr.Coordinates.from_pandas_multiindex(index, "cell")
 
 
 def _column_attrs(name: str) -> dict:
