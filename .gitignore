@@ -12,3 +12,6 @@ dist/
 /build-oracle/
 *.o
 *.mod
+
+# Files the example notebooks write
+/examples/output/
