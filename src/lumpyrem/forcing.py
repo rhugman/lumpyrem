@@ -19,14 +19,15 @@ but wrong answers out of this model, which is why the rule is visible.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-__all__ = ["Fill", "Forcing", "GridForcing", "VARIABLES", "FORTRAN_FILL", "ForcingError"]
+__all__ = ["Fill", "Forcing", "GridForcing", "ZonedForcing", "VARIABLES", "FORTRAN_FILL",
+           "ForcingError"]
 
 
 class Fill(str, Enum):
@@ -439,6 +440,200 @@ class GridForcing:
                 out[name] = np.full(len(days), DEFAULTS[name])
         _validate(out)
         return out
+
+
+@dataclass(frozen=True, eq=False)
+class ZonedForcing:
+    """Forcing held once per zone, for a grid of many cells in few zones.
+
+    A :class:`GridForcing` stores every variable once per cell, which for a
+    groundwater model of tens of thousands of cells over decades of days is
+    more memory than the run needs: in practice rainfall, evaporation and
+    crop calendars are known per gauge, farm or irrigation district, and
+    every cell of one shares them.  Here each variable is held per *zone* --
+    a ``(ntime, nzone)`` block, a series every zone shares, or a number --
+    and each cell names its zone.  Variable names, defaults and fill rules
+    are exactly those of :class:`Forcing`.
+
+    Vegetation can also be given the LUMPREM way, as a class calendar: a
+    per-zone series of integer class codes (native vegetation, crop, fallow,
+    ...) and, for each cell, a crop factor and a gamma per class.  The cell
+    tables are what a calibration varies, cell by cell; the calendar is what
+    the land-use records say, zone by zone.  Class codes are forward-filled
+    between the days they are listed on.
+
+    Build one with :meth:`from_frames`.
+
+    Attributes:
+        zones: the zone-level forcing, a :class:`GridForcing` with one column
+            per zone, labelled by zone.
+        cell_zone: ``(ncell,)`` 0-based column of ``zones`` each cell reads.
+        veg_class: ``(nlisted, nzone)`` class codes, NaN where not listed,
+            on ``veg_index``; or ``None``.
+        veg_index: the dates ``veg_class`` is listed on, in order.
+        crop_factor_table, veg_gamma_table: ``(ncell, nclass)`` or ``None``.
+        cells: optional cell labels, matched against a grid's names.
+    """
+
+    zones: GridForcing
+    cell_zone: np.ndarray
+    veg_class: np.ndarray | None = None
+    veg_index: pd.DatetimeIndex | None = None
+    crop_factor_table: np.ndarray | None = None
+    veg_gamma_table: np.ndarray | None = None
+    cells: tuple | None = None
+
+    @classmethod
+    def from_frames(cls, cell_zone, *, fill: Mapping[str, str | Fill] | None = None,
+                    veg_class=None, cells=None, **variables) -> ZonedForcing:
+        """Build from per-zone tables.
+
+        Args:
+            cell_zone: one zone label per cell.  Every label must appear as a
+                column of each per-zone table.
+            fill: per-variable overrides of :data:`FORTRAN_FILL`.
+            veg_class: optional class calendar: a DataFrame indexed by date
+                with one column per zone, or a Series every zone shares, of
+                integer codes ``0 .. nclass - 1``.  With it, ``crop_factor``
+                and ``veg_gamma`` must be ``(ncell, nclass)`` arrays -- one
+                row per cell -- or ``(nclass,)`` arrays every cell shares.
+            cells: labels for the cells, or ``None``.
+            **variables: each a DataFrame indexed by date with one column per
+                zone, a Series indexed by date shared by every zone, or a
+                number.  Dates need not agree between variables: each is
+                listed on its own dates and filled by its own rule.
+        """
+        cell_zone = np.asarray(cell_zone)
+        if cell_zone.ndim != 1 or cell_zone.size == 0:
+            raise ForcingError("cell_zone must be a non-empty 1-D sequence of zone labels")
+        labels, index_of_cell = np.unique(cell_zone, return_inverse=True)
+        ncell = cell_zone.size
+        if cells is not None:
+            cells = tuple(cells)
+            if len(cells) != ncell:
+                raise ForcingError(f"{len(cells)} cell labels for {ncell} cells")
+
+        tables = {}
+        if veg_class is not None:
+            for name in ("crop_factor", "veg_gamma"):
+                if name not in variables:
+                    raise ForcingError(f"veg_class needs {name} as a per-cell table "
+                                       f"of one value per class")
+                table = np.asarray(variables.pop(name), dtype=np.float64)
+                if table.ndim == 1:
+                    table = np.broadcast_to(table, (ncell, table.size))
+                if table.ndim != 2 or table.shape[0] != ncell:
+                    raise ForcingError(f"{name}: expected (ncell, nclass) = ({ncell}, "
+                                       f"nclass) or (nclass,); got {table.shape}")
+                tables[name] = np.ascontiguousarray(table)
+            if tables["crop_factor"].shape != tables["veg_gamma"].shape:
+                raise ForcingError("crop_factor and veg_gamma tables differ in shape: "
+                                   f"{tables['crop_factor'].shape} and "
+                                   f"{tables['veg_gamma'].shape}")
+            cf, gm = tables["crop_factor"], tables["veg_gamma"]
+            if not (np.isfinite(cf).all() and (cf >= 0.0).all()):
+                raise ForcingError("crop_factor table must be finite and >= 0")
+            if not (np.isfinite(gm).all() and (gm > 0.0).all()):
+                raise ForcingError("veg_gamma table must be finite and > 0")
+
+        unknown = [k for k in variables if k not in VARIABLES]
+        if unknown:
+            raise ForcingError(
+                f"unknown forcing variable(s) {unknown}; known names are {list(VARIABLES)}"
+            )
+        timed = [v for v in variables.values() if isinstance(v, (pd.Series, pd.DataFrame))]
+        if not timed:
+            raise ForcingError("ZonedForcing needs at least one variable as a dated "
+                               "Series or DataFrame")
+        index = timed[0].index
+        for v in timed[1:]:
+            index = index.union(v.index)
+        index = _day_index(index)
+
+        def by_zone(name: str, frame: pd.DataFrame, on: pd.DatetimeIndex) -> np.ndarray:
+            missing = [z for z in labels.tolist() if z not in frame.columns]
+            if missing:
+                raise ForcingError(f"{name}: no column for zone(s) {missing[:10]}"
+                                   f"{' ...' if len(missing) > 10 else ''}")
+            frame = frame.loc[:, list(labels)].set_axis(_day_index(frame.index), axis=0)
+            return frame.reindex(on).to_numpy(dtype=np.float64)
+
+        arrays = {}
+        for name, value in variables.items():
+            if isinstance(value, pd.DataFrame):
+                arrays[name] = by_zone(name, value, index)
+            elif isinstance(value, pd.Series):
+                series = value.set_axis(_day_index(value.index))
+                arrays[name] = series.reindex(index).to_numpy(dtype=np.float64)
+            else:
+                arrays[name] = value
+        if not any(np.ndim(a) == 2 for a in arrays.values()):
+            # GridForcing wants one block; a shared series broadcast to every
+            # zone is the same forcing.
+            name = next(k for k in arrays if np.ndim(arrays[k]) == 1)
+            arrays[name] = np.repeat(arrays[name][:, None], labels.size, axis=1)
+        zones = GridForcing.from_arrays(index, fill=fill, cells=tuple(labels.tolist()),
+                                        **arrays)
+
+        veg, veg_index = None, None
+        if veg_class is not None:
+            if isinstance(veg_class, pd.Series):
+                veg_class = pd.DataFrame({z: veg_class for z in labels.tolist()})
+            if not isinstance(veg_class, pd.DataFrame):
+                raise ForcingError("veg_class must be a dated DataFrame (one column per "
+                                   "zone) or a dated Series")
+            veg_index = _day_index(veg_class.index).sort_values()
+            veg = by_zone("veg_class", veg_class, veg_index)
+            listed = veg[~np.isnan(veg)]
+            nclass = tables["crop_factor"].shape[1]
+            if listed.size and (np.any(listed != np.round(listed)) or listed.min() < 0
+                                or listed.max() >= nclass):
+                raise ForcingError(f"veg_class codes must be integers in 0 .. {nclass - 1}, "
+                                   f"one per column of the crop_factor table")
+        return cls(zones=zones, cell_zone=np.ascontiguousarray(index_of_cell, dtype=np.int64),
+                   veg_class=veg, veg_index=veg_index,
+                   crop_factor_table=tables.get("crop_factor"),
+                   veg_gamma_table=tables.get("veg_gamma"), cells=cells)
+
+    @property
+    def ncell(self) -> int:
+        return int(self.cell_zone.size)
+
+    @property
+    def nzone(self) -> int:
+        return self.zones.ncell
+
+    @property
+    def span(self) -> tuple[pd.Timestamp, pd.Timestamp]:
+        """First and last listed date of the zone forcing."""
+        return self.zones.span
+
+    def provided(self) -> set[str]:
+        out = self.zones.provided()
+        if self.veg_class is not None:
+            out |= {"crop_factor", "veg_gamma"}
+        return out
+
+    def to_daily(self, start=None, end=None) -> tuple[dict[str, np.ndarray],
+                                                      np.ndarray | None]:
+        """Resolve onto one value per day over ``[start, end]``.
+
+        Returns the zone forcing -- ``(ndays, nzone)`` per zone or ``(ndays,)``
+        shared -- and the daily class codes, ``(ndays, nzone)`` int64, or
+        ``None`` without a class calendar.
+        """
+        if self.veg_class is None:
+            return self.zones.to_daily(start, end), None
+        need = ("rainfall", "pot_evap")
+        zones = self.zones
+        if "veg_gamma" not in zones.provided():
+            # veg_gamma has no default and comes from the cell tables here, so
+            # the zone forcing resolves a placeholder the kernel never reads.
+            zones = replace(zones, constants={**zones.constants, "veg_gamma": 1.0})
+        daily = zones.to_daily(start, end, need=need)
+        days = _daily_window(zones, start, end, need)
+        codes = _expand_block("veg_class", self.veg_index, self.veg_class, days, Fill.FORWARD)
+        return daily, np.ascontiguousarray(codes, dtype=np.int64)
 
 
 def _daily_window(forcing: Forcing | GridForcing, start, end,

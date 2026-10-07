@@ -59,6 +59,34 @@ writes results to it.
 pip install "lumpyrem[fast,xarray]"
 ```
 
+### Forcing by zone, and MODFLOW 6 recharge
+
+A groundwater model can have tens of thousands of recharge cells but only a
+handful of rain gauges, farms or irrigation districts. `ZonedForcing` holds
+forcing once per zone, and can take vegetation the LUMPREM way: a class
+calendar per zone, and a crop factor and gamma per class for each cell.
+`columns=` keeps only the output a run needs.
+
+```python
+import lumpyrem.mf6 as lmf6
+
+cells = lmf6.top_active_cells(gwf.get_package("disv"))       # uppermost active cells
+periods = lmf6.stress_periods(sim.tdis, gwf.get_package("sto"),
+                              steady_state_window=("1960-01-01", "1980-01-01"))
+forcing = lr.ZonedForcing.from_frames(
+    cell_farm,                                  # one zone label per cell
+    rainfall=rain_by_farm,                      # DataFrame, date x zone
+    pot_evap=pet,                               # Series, shared
+    veg_class=crop_calendar,                    # DataFrame of class codes 0, 1, ...
+    crop_factor=cf_table, veg_gamma=gamma_table,    # (ncell, nclass)
+)
+results = grid.run(forcing, times=lmf6.output_times(periods, "1960-01-01"),
+                   start="1960-01-01", end=periods["end"].iloc[-1] - pd.Timedelta(days=1),
+                   columns=["net_recharge"])
+rates = lmf6.period_rates(results, periods, factor=0.001)   # (nper, ncell), m/day
+lmf6.recharge_package(gwf, cells, rates, boundnames=names)  # writes the RCH file
+```
+
 ### Threads, and parallel calibration
 
 A grid runs on every core by default. Under PEST++, where as many model runs
@@ -72,6 +100,21 @@ or set `LUMPYREM_THREADS=1` in the workers' environment, which every grid
 run then follows without changing the script. One thread runs a serial loop
 that never starts Numba's thread pool. Results are identical at any thread
 count.
+
+Numba compiles the kernels on their first call, which takes longer than a
+small run. Compile them into the cache once, after installing or updating:
+
+```bash
+python -m lumpyrem.warmup                      # or: lumpyrem-compile
+python -m lumpyrem.warmup --cache-dir /shared  # one cache for every PEST++ worker
+```
+
+The cache is keyed on where the package lives, so workers that each hold their
+own copy of lumpyrem should share one `NUMBA_CACHE_DIR`.
+
+`recharge_package` writes the list-based RCH file directly by default, which
+is seconds rather than minutes for a large grid; `method="flopy"` builds a
+`ModflowGwfrch` object instead.
 
 ### Examples
 

@@ -39,9 +39,6 @@ def _rename(name: str) -> str:
 #: Output columns.  The kernel's names, with the one hyphen removed.
 COLUMNS: tuple[str, ...] = tuple(_rename(c) for c in KERNEL_COLUMNS)
 
-_BALANCE = COLUMNS.index("balance")
-_RAINFALL = COLUMNS.index("rainfall")
-_IRRIGATION = COLUMNS.index("irrigation")
 _DEFAULT_PLOT = ("rainfall", "total_rech", "evap_upper", "runoff")
 
 
@@ -128,7 +125,7 @@ class Results:
         Returns:
             The largest absolute residual, or 0.0 for an empty run.
         """
-        return _balance_error(self.values, relative)
+        return _balance_error(self.values, relative, self.columns)
 
     # ------------------------------------------------------------------
     def to_csv(self, path, **kwargs):
@@ -175,15 +172,22 @@ class Results:
                 f"{self.times[0].date()} to {self.times[-1].date()}, {state}>")
 
 
-def _balance_error(values: np.ndarray, relative: bool) -> float:
-    """Worst ``balance`` residual of one cell's ``(nrows, 26)`` table."""
-    resid = np.abs(values[:, _BALANCE])
+def _balance_error(values: np.ndarray, relative: bool,
+                   columns: tuple[str, ...] = COLUMNS) -> float:
+    """Worst ``balance`` residual of one cell's ``(nrows, ncolumn)`` table."""
+    need = ("balance", "rainfall", "irrigation") if relative else ("balance",)
+    missing = [c for c in need if c not in columns]
+    if missing:
+        raise KeyError(f"balance_error needs column(s) {missing}, which this run did "
+                       f"not keep")
+    resid = np.abs(values[:, columns.index("balance")])
     if resid.size == 0:
         return 0.0
     worst = float(resid.max())
     if not relative:
         return worst
-    inflow = float(np.abs(values[:, _RAINFALL]).sum() + np.abs(values[:, _IRRIGATION]).sum())
+    inflow = float(np.abs(values[:, columns.index("rainfall")]).sum()
+                   + np.abs(values[:, columns.index("irrigation")]).sum())
     return worst / inflow if inflow > 0.0 else 0.0
 
 
@@ -266,11 +270,12 @@ class GridResults:
             nonconverged_upper=int(self.nonconverged[i, 0]),
             nonconverged_lower=int(self.nonconverged[i, 1]),
             has_elevation=bool(self.has_elevation[i]),
+            columns=self.columns,
         )
 
     def balance_error(self, *, relative: bool = False) -> pd.Series:
         """Each cell's worst water-balance residual; see :meth:`Results.balance_error`."""
-        return pd.Series([_balance_error(self.values[:, i, :], relative)
+        return pd.Series([_balance_error(self.values[:, i, :], relative, self.columns)
                           for i in range(self.ncell)],
                          index=pd.Index(self.cells, name="cell"), name="balance_error")
 

@@ -27,13 +27,14 @@ import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from functools import cache
+import os
 
 import numpy as np
 
 from . import core
 
 __all__ = ["ENGINES", "THREADS_ENV", "CellRun", "compiled_available", "resolve",
-           "resolve_threads", "run_cells"]
+           "resolve_threads", "run_cells", "run_zoned_cells"]
 
 #: Environment variable giving the default thread count for grid runs, so a
 #: PEST worker can be held to one core without changing the script it runs.
@@ -255,3 +256,80 @@ def _run_python(params, rbuf, mbuf, forcing, outdays, nstep, mxiter, tol, n):
         values[c] = sim.values
         nonconv[c] = (sim.nonconverged_upper, sim.nonconverged_lower)
     return values, nonconv
+
+
+def run_zoned_cells(
+    params: np.ndarray,
+    rbuf: np.ndarray,
+    mbuf: np.ndarray,
+    zone: np.ndarray,
+    forcing: Mapping[str, np.ndarray],
+    outdays,
+    *,
+    nstep: int,
+    mxiter: int,
+    tol: float,
+    vegclass: np.ndarray | None = None,
+    cropfac_table: np.ndarray | None = None,
+    gamma_table: np.ndarray | None = None,
+    columns: Sequence[int] | None = None,
+    engine: str = "auto",
+    threads: int | None = None,
+) -> CellRun:
+    """Run ``params.shape[0]`` independent cells whose forcing is held per zone.
+
+    As :func:`run_cells`, except that each forcing variable is ``(1, ntime)``
+    or ``(nzone, ntime)`` and cell ``c`` reads row ``zone[c]``.  Forcing is
+    then sized by the number of zones rather than the number of cells, which
+    is what makes a grid of tens of thousands of cells over decades of days
+    fit in memory.
+
+    Args:
+        zone: ``(ncell,)`` 0-based row index into the zone forcing.
+        vegclass: optional ``(1 | nzone, ntime)`` integer vegetation-class
+            codes.  With it, cell ``c`` takes its crop factor and gamma on day
+            ``t`` from ``cropfac_table[c, k]`` and ``gamma_table[c, k]``,
+            ``k = vegclass[zone[c], t]``, and ``forcing["cropfac"]`` and
+            ``forcing["gamma"]`` are not read.
+        cropfac_table, gamma_table: ``(ncell, nclass)``, required with
+            ``vegclass``.
+        columns: kernel column indices to keep; all of them by default.
+            ``values`` is then ``(ncell, nrows, len(columns))``.
+        threads: as for :func:`run_cells`.
+    """
+    ncell = params.shape[0]
+    assert params.shape == (ncell, NPARAM), params.shape
+    assert rbuf.shape[0] == ncell and mbuf.shape[0] == ncell, (rbuf.shape, mbuf.shape)
+    assert set(forcing) == set(FORCING), sorted(forcing)
+    zone = np.ascontiguousarray(zone, dtype=np.int64)
+    assert zone.shape == (ncell,), zone.shape
+    if (vegclass is None) != (cropfac_table is None) or             (vegclass is None) != (gamma_table is None):
+        raise ValueError("vegclass, cropfac_table and gamma_table go together")
+    ntime = forcing["rain"].shape[1]
+    columns = np.arange(len(core.COLUMNS), dtype=np.int64) if columns is None         else np.ascontiguousarray(columns, dtype=np.int64)
+    outdays = np.ascontiguousarray(outdays, dtype=np.int64)
+    n = nrows(outdays, ntime)
+    days = np.concatenate(([0], np.minimum(outdays[: n - 1], ntime))).astype(np.int64)
+
+    if resolve(engine) == "compiled":
+        from . import compiled
+        values, nonconv = compiled.simulate_zoned_cells(
+            params, zone, rbuf=rbuf, mbuf=mbuf, **forcing, vegclass=vegclass,
+            cropfac_table=cropfac_table, gamma_table=gamma_table, outdays=outdays,
+            nstep=nstep, mxiter=mxiter, tol=tol, columns=columns, threads=threads)
+    else:
+        values = np.empty((ncell, n, columns.size))
+        nonconv = np.zeros((ncell, 2), dtype=np.int64)
+        for c in range(ncell):
+            z = int(zone[c])
+            cell = {name: a[z if a.shape[0] > 1 else 0][None, :]
+                    for name, a in forcing.items()}
+            if vegclass is not None:
+                k = vegclass[z if vegclass.shape[0] > 1 else 0]
+                cell["cropfac"] = cropfac_table[c][k][None, :]
+                cell["gamma"] = gamma_table[c][k][None, :]
+            full, nc = _run_python(params[c:c + 1], rbuf[c:c + 1], mbuf[c:c + 1], cell,
+                                   outdays, nstep, mxiter, tol, n)
+            values[c] = full[0][:, columns]
+            nonconv[c] = nc[0]
+    return CellRun(days=days, values=values, nonconverged=nonconv)

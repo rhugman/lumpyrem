@@ -31,7 +31,7 @@ import pandas as pd
 
 from . import __version__
 from .forcing import VARIABLES, Fill, Forcing, ForcingError, GridForcing
-from .results import COLUMNS, GridResults, Results
+from .results import GridResults, Results
 
 __all__ = ["forcing_from_dataset", "read_forcing", "to_dataset", "to_netcdf"]
 
@@ -75,7 +75,7 @@ def to_dataset(results: GridResults | Results, *,
     dims = ("time", "cell") if grid else ("time",)
 
     data_vars = {name: (dims, results.column(name), _column_attrs(name))
-                 for name in COLUMNS}
+                 for name in results.columns}
     coords = {"time": results.times, "day": ("time", results.days)}
     attrs = {
         "source": f"lumpyrem {__version__}",

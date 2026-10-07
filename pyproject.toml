@@ -11,6 +11,10 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = ["numpy>=1.24", "pandas>=2.0"]
 
+[project.scripts]
+# Compile the Numba kernels into the cache ahead of time; see lumpyrem/warmup.py
+lumpyrem-compile = "lumpyrem.warmup:main"
+
 [project.optional-dependencies]
 # Numba's supported NumPy ceiling is why this is pinned; see docs/conversion-plan.md
 # section 7.  Without it the package still runs, on the pure-Python kernel.

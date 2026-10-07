@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 
 from . import engine as _engine
-from .forcing import Forcing, GridForcing
+from .forcing import Forcing, GridForcing, ZonedForcing
 from .parameters import (
     InitialState,
     LowerStore,
@@ -294,15 +294,21 @@ class ModelGrid:
 
     # ------------------------------------------------------------------
     def run(self, forcing, *, times=None, start=None, end=None, engine: str = "auto",
-            threads: int | None = None, single_threaded: bool | None = None,
-            **forcing_kwargs) -> GridResults:
+            columns: Sequence[str] | None = None, threads: int | None = None,
+            single_threaded: bool | None = None, **forcing_kwargs) -> GridResults:
         """Run every cell and return results on ``(time, cell, variable)``.
 
         Args:
             forcing: shared by every cell -- anything :meth:`Model.run` takes
-                -- or a :class:`~lumpyrem.forcing.GridForcing` with one column
-                per cell.
+                -- a :class:`~lumpyrem.forcing.GridForcing` with one column
+                per cell, or a :class:`~lumpyrem.forcing.ZonedForcing` with
+                one column per zone and a zone for each cell.
             times, start, end, engine: as for :meth:`Model.run`.
+            columns: output columns to keep, all of them by default.  A large
+                grid reported often is mostly columns nobody reads: 50,000
+                cells at 550 stress periods is 5.7 GB with all 26 and 0.2 GB
+                with ``columns=["net_recharge"]``.  With a ZonedForcing the
+                others are never stored at all.
             threads: how many threads the compiled engine may use.  ``None``
                 (the default) takes the ``LUMPYREM_THREADS`` environment
                 variable if set, and otherwise every thread Numba has.
@@ -317,10 +323,15 @@ class ModelGrid:
         Returns:
             :class:`~lumpyrem.results.GridResults`.
         """
+        keep = _column_indices(columns)
         try:
             nthread = _engine.resolve_threads(threads, single_threaded)
         except ValueError as exc:
             raise ModelError(str(exc)) from None
+        if isinstance(forcing, ZonedForcing):
+            if forcing_kwargs:
+                raise ModelError("options cannot be applied to an existing ZonedForcing")
+            return self._run_zoned(forcing, times, start, end, engine, keep, nthread)
         if isinstance(forcing, GridForcing):
             if forcing_kwargs:
                 raise ModelError("options cannot be applied to an existing GridForcing")
@@ -340,22 +351,73 @@ class ModelGrid:
         outdays = _output_days(times, start, ndays)
         run = _run_kernel(self.cells, _kernel_forcing(daily), outdays, self.solver, engine,
                           threads=nthread)
+        values = run.values if keep is None else run.values[:, :, keep]
+        return self._results(start, run.days, values, run.nonconverged, keep)
 
+    def _run_zoned(self, forcing: ZonedForcing, times, start, end, engine,
+                   keep: list[int] | None, threads: int | None) -> GridResults:
+        """:meth:`run` for forcing held per zone."""
+        if forcing.ncell != self.ncell:
+            raise ModelError(f"the forcing has {forcing.ncell} cells and the grid "
+                             f"has {self.ncell}")
+        if forcing.cells is not None and forcing.cells != self.names:
+            raise ModelError("the forcing's cell labels do not match the grid's names, "
+                             "in order")
+        if engine not in _engine.ENGINES:
+            raise ModelError(f"engine must be one of {list(_engine.ENGINES)}, got {engine!r}")
+        start, ndays = _run_window(forcing, start, end)
+        daily, vegclass = forcing.to_daily(start, start + (ndays - 1) * _DAY)
+        outdays = _output_days(times, start, ndays)
+        models = self.cells
+        params = np.stack([_engine.param_row(**_kernel_params(m)) for m in models])
+        rbuf = _engine.buffer_rows([m.initial.drain_buffer for m in models])
+        mbuf = _engine.buffer_rows([m.initial.macro_buffer for m in models])
+        cols = list(range(len(COLUMNS))) if keep is None else keep
+        run = _engine.run_zoned_cells(
+            params, rbuf, mbuf, forcing.cell_zone, _kernel_forcing(daily), outdays,
+            nstep=self.solver.nstep, mxiter=self.solver.mxiter, tol=self.solver.tol,
+            vegclass=None if vegclass is None else np.ascontiguousarray(vegclass.T),
+            cropfac_table=forcing.crop_factor_table, gamma_table=forcing.veg_gamma_table,
+            columns=cols, engine=engine, threads=threads)
+        for j, k in enumerate(cols):
+            if k in (_ELEV, _DWT):
+                for i, model in enumerate(models):
+                    if model.elevation is None:
+                        run.values[i, :, j] = np.nan
+        return self._results(start, run.days, run.values, run.nonconverged, keep)
+
+    def _results(self, start, days, values, nonconverged, keep) -> GridResults:
         results = GridResults(
-            times=_stamps(start, run.days),
-            days=run.days,
-            values=run.values.transpose(1, 0, 2),
+            times=_stamps(start, days),
+            days=days,
+            values=values.transpose(1, 0, 2),
             cells=self.names,
-            nonconverged=run.nonconverged,
+            nonconverged=nonconverged,
             has_elevation=np.array([c.elevation is not None for c in self.cells]),
+            columns=COLUMNS if keep is None else tuple(COLUMNS[k] for k in keep),
         )
         if not results.converged:
             failed = results.nonconverged_cells
-            upper, lower = (int(v) for v in run.nonconverged.sum(axis=0))
+            upper, lower = (int(v) for v in nonconverged.sum(axis=0))
             _report_convergence(self.solver, upper, lower,
                                 where=f" across {len(failed)} of {self.ncell} cells "
                                       f"(first: {failed[0]!r})")
         return results
+
+
+def _column_indices(columns) -> list[int] | None:
+    """Positions of the named output columns, or ``None`` for all of them."""
+    if columns is None:
+        return None
+    if isinstance(columns, str):
+        columns = [columns]
+    unknown = [c for c in columns if c not in COLUMNS]
+    if unknown:
+        raise ModelError(f"unknown output column(s) {unknown}; available columns are "
+                         f"{list(COLUMNS)}")
+    if not columns:
+        raise ModelError("columns is empty; pass None to keep every column")
+    return [COLUMNS.index(c) for c in columns]
 
 
 def _count_cells(groups: Mapping[str, Mapping | None], names, ncell) -> int:

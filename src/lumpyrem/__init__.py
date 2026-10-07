@@ -38,7 +38,7 @@ Many independent cells::
     results.to_xarray()["total_rech"]          # (time, cell)
 """
 
-from .forcing import Fill, Forcing, ForcingError, GridForcing
+from .forcing import Fill, Forcing, ForcingError, GridForcing, ZonedForcing
 from .model import Model, ModelError, ModelGrid
 from .parameters import (
     InitialState,
@@ -69,5 +69,6 @@ __all__ = [
     "Solver",
     "UpperStore",
     "VolumeToElevation",
+    "ZonedForcing",
     "__version__",
 ]
