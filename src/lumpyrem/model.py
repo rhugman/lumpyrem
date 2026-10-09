@@ -373,7 +373,7 @@ def _count_cells(groups: Mapping[str, Mapping | None], names, ncell) -> int:
 def _per_cell(name: str, value) -> bool:
     """Is this field given per cell, rather than shared?"""
     if name in ("drain_buffer", "macro_buffer"):
-        return len(value) > 0 and np.ndim(value[0]) == 1
+        return len(value) > 0 and np.ndim(_at(value, 0)) == 1
     if value is None or isinstance(value, str):
         return False
     ndim = np.ndim(value)
@@ -383,9 +383,18 @@ def _per_cell(name: str, value) -> bool:
 
 
 def _cell_fields(fields: Mapping[str, object], i: int) -> dict:
-    """Cell ``i``'s values of a group of fields."""
-    return {name: (value[i] if _per_cell(name, value) else value)
+    """Cell ``i``'s values of a group of fields.
+
+    By position, always: a pandas Series indexed ``[0, 800, ...]`` -- rows
+    picked from a table -- would otherwise be indexed by label, and fail or,
+    worse, pick another cell's value.
+    """
+    return {name: (_at(value, i) if _per_cell(name, value) else value)
             for name, value in fields.items()}
+
+
+def _at(value, i: int):
+    return value.iloc[i] if isinstance(value, pd.Series) else value[i]
 
 
 # ---------------------------------------------------------------------------

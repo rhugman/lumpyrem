@@ -244,6 +244,17 @@ def test_from_arrays_names_the_bad_cell():
     assert ModelGrid.from_arrays(upper=GOOD, ncell=4).ncell == 4
 
 
+def test_from_arrays_indexes_series_by_position():
+    """A Series picked from a table keeps its row labels; cell i is still row i."""
+    for index in ([800, 5, 2], [2, 0, 1]):      # no label 0, then a permutation
+        table = pd.DataFrame({"maxvol": [100.0, 200.0, 300.0],
+                              "buffer": [(1.0,), (0.5, 0.5), (0.0,)]}, index=index)
+        grid = ModelGrid.from_arrays(upper=dict(GOOD, maxvol=table["maxvol"]),
+                                     initial=dict(drain_buffer=table["buffer"]))
+        assert [c.upper.maxvol for c in grid.cells] == [100.0, 200.0, 300.0]
+        assert [c.initial.drain_buffer for c in grid.cells] == [(1.0,), (0.5, 0.5), (0.0,)]
+
+
 def test_a_grid_shares_one_solver():
     a = Model(upper=UpperStore(**GOOD))
     with pytest.raises(ModelError, match="one solver"):
