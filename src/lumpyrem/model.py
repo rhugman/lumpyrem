@@ -294,6 +294,7 @@ class ModelGrid:
 
     # ------------------------------------------------------------------
     def run(self, forcing, *, times=None, start=None, end=None, engine: str = "auto",
+            threads: int | None = None, single_threaded: bool | None = None,
             **forcing_kwargs) -> GridResults:
         """Run every cell and return results on ``(time, cell, variable)``.
 
@@ -301,15 +302,25 @@ class ModelGrid:
             forcing: shared by every cell -- anything :meth:`Model.run` takes
                 -- or a :class:`~lumpyrem.forcing.GridForcing` with one column
                 per cell.
-            times, start, end, engine: as for :meth:`Model.run`.  The
-                compiled engine runs cells on every core Numba is allowed;
-                set ``NUMBA_NUM_THREADS`` to use fewer.
+            times, start, end, engine: as for :meth:`Model.run`.
+            threads: how many threads the compiled engine may use.  ``None``
+                (the default) takes the ``LUMPYREM_THREADS`` environment
+                variable if set, and otherwise every thread Numba has.
+            single_threaded: ``True`` is ``threads=1``: cells run one after
+                another on the calling thread and the Numba thread pool is
+                never started.  Use it when many runs share one machine, as
+                PEST++ workers do, so each run holds one core.  Results are
+                identical whatever the thread count.
             **forcing_kwargs: passed to the Forcing constructor when
                 ``forcing`` is not already one.
 
         Returns:
             :class:`~lumpyrem.results.GridResults`.
         """
+        try:
+            nthread = _engine.resolve_threads(threads, single_threaded)
+        except ValueError as exc:
+            raise ModelError(str(exc)) from None
         if isinstance(forcing, GridForcing):
             if forcing_kwargs:
                 raise ModelError("options cannot be applied to an existing GridForcing")
@@ -327,7 +338,8 @@ class ModelGrid:
         start, ndays = _run_window(forcing, start, end)
         daily = forcing.to_daily(start, start + (ndays - 1) * _DAY)
         outdays = _output_days(times, start, ndays)
-        run = _run_kernel(self.cells, _kernel_forcing(daily), outdays, self.solver, engine)
+        run = _run_kernel(self.cells, _kernel_forcing(daily), outdays, self.solver, engine,
+                          threads=nthread)
 
         results = GridResults(
             times=_stamps(start, run.days),
@@ -455,7 +467,7 @@ def _kernel_forcing(daily: Mapping[str, np.ndarray]) -> dict[str, np.ndarray]:
 
 
 def _run_kernel(models: Sequence[Model], forcing, outdays, solver: Solver,
-                engine: str) -> _engine.CellRun:
+                engine: str, threads: int | None = None) -> _engine.CellRun:
     """Pack the models into rows, run them, and blank what has no conversion."""
     if engine not in _engine.ENGINES:
         raise ModelError(f"engine must be one of {list(_engine.ENGINES)}, got {engine!r}")
@@ -463,7 +475,8 @@ def _run_kernel(models: Sequence[Model], forcing, outdays, solver: Solver,
     rbuf = _engine.buffer_rows([m.initial.drain_buffer for m in models])
     mbuf = _engine.buffer_rows([m.initial.macro_buffer for m in models])
     run = _engine.run_cells(params, rbuf, mbuf, forcing, outdays, nstep=solver.nstep,
-                            mxiter=solver.mxiter, tol=solver.tol, engine=engine)
+                            mxiter=solver.mxiter, tol=solver.tol, engine=engine,
+                            threads=threads)
     for i, model in enumerate(models):
         if model.elevation is None:
             run.values[i, :, _ELEV] = np.nan

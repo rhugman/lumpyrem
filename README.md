@@ -59,6 +59,20 @@ writes results to it.
 pip install "lumpyrem[fast,xarray]"
 ```
 
+### Threads, and parallel calibration
+
+A grid runs on every core by default. Under PEST++, where as many model runs
+go at once as there are cores, hold each run to one:
+
+```python
+results = grid.run(forcing, times="MS", single_threaded=True)   # or threads=2, ...
+```
+
+or set `LUMPYREM_THREADS=1` in the workers' environment, which every grid
+run then follows without changing the script. One thread runs a serial loop
+that never starts Numba's thread pool. Results are identical at any thread
+count.
+
 ### Examples
 
 Three notebooks in [`examples/`](examples/README.md) go from one site to a

@@ -320,3 +320,53 @@ def test_the_package_imports_and_runs_without_numba():
     out = subprocess.run([sys.executable, "-c", code], env=env, check=True,
                          capture_output=True, text=True).stdout
     assert out.split() == ["(3,", "2,", "26)"]
+
+
+# ---------------------------------------------------------------------------
+# Threads
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif("compiled" not in ENGINES, reason="needs Numba")
+@pytest.mark.parametrize("per_cell", [False, True])
+def test_thread_count_does_not_change_results(shared_schedule, per_cell, monkeypatch):
+    """One thread runs the serial loop, more run the parallel one: same numbers."""
+    cases = shared_schedule
+    grid = ModelGrid([model_for(c) for c in cases])
+    forcing = grid_forcing(cases) if per_cell else forcing_for(cases[0])
+    times = cases[0].outdays
+    monkeypatch.delenv("LUMPYREM_THREADS", raising=False)
+    ref = grid.run(forcing, times=times, engine="compiled")
+    for kwargs in (dict(single_threaded=True), dict(threads=1), dict(threads=3)):
+        got = grid.run(forcing, times=times, engine="compiled", **kwargs)
+        assert np.array_equal(ref.values, got.values, equal_nan=True), kwargs
+    monkeypatch.setenv("LUMPYREM_THREADS", "1")
+    got = grid.run(forcing, times=times, engine="compiled")
+    assert np.array_equal(ref.values, got.values, equal_nan=True)
+
+
+def test_thread_options_resolve(monkeypatch):
+    resolve_threads = lp_engine.resolve_threads
+    monkeypatch.delenv("LUMPYREM_THREADS", raising=False)
+    assert resolve_threads() is None
+    assert resolve_threads(single_threaded=True) == 1
+    assert resolve_threads(threads=4) == 4
+    monkeypatch.setenv("LUMPYREM_THREADS", "2")
+    assert resolve_threads() == 2
+    assert resolve_threads(single_threaded=True) == 1
+    assert resolve_threads(threads=5) == 5
+    with pytest.raises(ValueError):
+        resolve_threads(threads=2, single_threaded=True)
+    with pytest.raises(ValueError):
+        resolve_threads(threads=0)
+    monkeypatch.setenv("LUMPYREM_THREADS", "two")
+    with pytest.raises(ValueError):
+        resolve_threads()
+
+
+def test_a_bad_thread_count_is_refused(forcing, monkeypatch):
+    monkeypatch.delenv("LUMPYREM_THREADS", raising=False)
+    grid = ModelGrid.from_arrays(upper=GOOD, ncell=2)
+    with pytest.raises(ModelError, match="threads must be an integer"):
+        grid.run(forcing, threads=0)
+    with pytest.raises(ModelError, match="contradicts"):
+        grid.run(forcing, threads=2, single_threaded=True)

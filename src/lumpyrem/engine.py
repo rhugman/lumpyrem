@@ -23,6 +23,7 @@ variable of shape ``(1, ntime)`` when every cell shares it or
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from functools import cache
@@ -31,7 +32,12 @@ import numpy as np
 
 from . import core
 
-__all__ = ["ENGINES", "CellRun", "compiled_available", "resolve", "run_cells"]
+__all__ = ["ENGINES", "THREADS_ENV", "CellRun", "compiled_available", "resolve",
+           "resolve_threads", "run_cells"]
+
+#: Environment variable giving the default thread count for grid runs, so a
+#: PEST worker can be held to one core without changing the script it runs.
+THREADS_ENV = "LUMPYREM_THREADS"
 
 # -- The parameter row.
 MAXVOL, IRRIGVOLFRAC, RDELAY, MDELAY, KS, M, L, MFLOWMAX = range(8)
@@ -135,6 +141,35 @@ def resolve(engine: str) -> str:
     return "python"
 
 
+def resolve_threads(threads: int | None = None,
+                    single_threaded: bool | None = None) -> int | None:
+    """The thread count a grid run should use; ``None`` means all of them.
+
+    ``single_threaded=True`` is ``threads=1``.  With neither given, the
+    ``LUMPYREM_THREADS`` environment variable decides, and unset it is every
+    thread Numba has (``NUMBA_NUM_THREADS``, one per logical core by default).
+
+    One thread is the setting for parallel calibration -- PEST++ running as
+    many model runs at once as there are cores -- where a grid run that
+    spreads over every core competes with all the others for each of them.
+    """
+    if single_threaded:
+        if threads not in (None, 1):
+            raise ValueError(f"single_threaded=True contradicts threads={threads}")
+        return 1
+    if threads is None:
+        env = os.environ.get(THREADS_ENV, "").strip()
+        if not env:
+            return None
+        try:
+            threads = int(env)
+        except ValueError:
+            raise ValueError(f"{THREADS_ENV}={env!r} is not an integer") from None
+    if isinstance(threads, bool) or int(threads) != threads or threads < 1:
+        raise ValueError(f"threads must be an integer >= 1 or None, got {threads!r}")
+    return int(threads)
+
+
 @dataclass(frozen=True)
 class CellRun:
     """What the kernel returns for a set of cells sharing one output schedule."""
@@ -155,6 +190,7 @@ def run_cells(
     mxiter: int,
     tol: float,
     engine: str = "auto",
+    threads: int | None = None,
 ) -> CellRun:
     """Run ``params.shape[0]`` independent cells.
 
@@ -167,6 +203,9 @@ def run_cells(
         outdays: 1-based output days, shared by every cell.
         nstep, mxiter, tol: solver settings, shared by every cell.
         engine: ``"auto"``, ``"compiled"`` or ``"python"``.
+        threads: threads for the compiled engine, from
+            :func:`resolve_threads`; ``1`` never starts the Numba thread
+            pool.  The Python engine always runs on one.
     """
     ncell = params.shape[0]
     assert params.shape == (ncell, NPARAM), params.shape
@@ -184,7 +223,7 @@ def run_cells(
         from . import compiled
         values, nonconv = compiled.simulate_cells(
             params, rbuf=rbuf, mbuf=mbuf, **forcing, outdays=outdays,
-            nstep=nstep, mxiter=mxiter, tol=tol)
+            nstep=nstep, mxiter=mxiter, tol=tol, threads=threads)
     else:
         values, nonconv = _run_python(params, rbuf, mbuf, forcing, outdays,
                                       nstep, mxiter, tol, n)
