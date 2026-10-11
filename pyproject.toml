@@ -34,7 +34,10 @@ packages = ["src/lumpyrem"]
 testpaths = ["tests"]
 pythonpath = ["tests", "src"]
 addopts = "-ra --strict-markers"
-markers = ["oracle: requires gfortran to build the reference implementation"]
+markers = [
+    "oracle: requires gfortran to build the reference implementation",
+    "mf6: runs MODFLOW 6 (MF6_EXE, or mf6 on the PATH)",
+]
 
 [tool.ruff]
 line-length = 100

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -81,9 +83,10 @@ def test_period_rates_and_rch(sim, tmp_path):
     ss = daily.loc["2000-01-02":"2001-01-01"].sum() / 366 * 0.001
     np.testing.assert_allclose(rates[0], ss.to_numpy(), rtol=1e-12)
 
+    s.write_simulation(silent=True)
     path = lmf6.recharge_package(gwf, cells, rates, boundnames=["z1", "z1", "z2"],
                                  filename="m.rch", obs_file="m.rch.obs")
-    text = open(path).read()
+    text = Path(path).read_text()
     assert "BOUNDNAMES" in text and "OBS6  FILEIN  m.rch.obs" in text
     assert text.count("BEGIN period") == 4 and "MAXBOUND  3" in text
     rows = [line.split() for line in text.splitlines()
@@ -99,3 +102,68 @@ def test_period_rates_and_rch(sim, tmp_path):
     assert gwf.get_package("rch") is pkg
     spd = pkg.stress_period_data.get_data(2)
     np.testing.assert_allclose(spd["recharge"], rates[2])
+
+
+def _packages(nam):
+    """The PACKAGES block of a name file, one token list per entry."""
+    lines = nam.read_text().splitlines()
+    begin = next(i for i, line in enumerate(lines) if line.strip().upper() == "BEGIN PACKAGES")
+    end = next(i for i, line in enumerate(lines) if line.strip().upper() == "END PACKAGES")
+    return [line.split() for line in lines[begin + 1:end] if line.strip()]
+
+
+def test_fast_rch_is_listed_in_the_name_file(sim, tmp_path):
+    s, gwf, _ = sim
+    s.write_simulation(silent=True)
+    nam = tmp_path / "m.nam"
+    assert not [e for e in _packages(nam) if e[0].upper() == "RCH6"]
+    cells = lmf6.top_active_cells(gwf.get_package("disv"))
+    rates = np.full((4, 3), 1e-3)
+
+    lmf6.recharge_package(gwf, cells, rates)
+    lmf6.recharge_package(gwf, cells, rates)            # a rewrite adds no second entry
+    assert [e for e in _packages(nam) if e[0].upper() == "RCH6"] == [["RCH6", "m.rch", "rch"]]
+
+    # Another file under the same package name replaces the entry.
+    lmf6.recharge_package(gwf, cells, rates, filename="other.rch")
+    assert [e for e in _packages(nam) if e[0].upper() == "RCH6"] == \
+        [["RCH6", "other.rch", "rch"]]
+
+    # A second RCH package is MODFLOW's to apply as well, so it warns.
+    with pytest.warns(UserWarning, match="also lists RCH6"):
+        lmf6.recharge_package(gwf, cells, rates, filename="more.rch", pname="rch2")
+    assert len([e for e in _packages(nam) if e[0].upper() == "RCH6"]) == 2
+
+    with pytest.raises(lmf6.MF6Error, match="STO6 package named 'sto'"):
+        # Refused before anything is written.
+        lmf6.recharge_package(gwf, cells, rates, filename="x.rch", pname="sto")
+    assert not (tmp_path / "x.rch").exists()
+
+
+def test_fast_rch_needs_the_simulation_written(sim):
+    _, gwf, _ = sim
+    cells = lmf6.top_active_cells(gwf.get_package("disv"))
+    with pytest.raises(lmf6.MF6Error, match="write the simulation"):
+        lmf6.recharge_package(gwf, cells, np.zeros((4, 3)))
+
+
+def test_boundnames_with_spaces_are_quoted(tmp_path):
+    layer, icpl = np.array([0, 0, 1]), np.array([0, 1, 2])
+    path = lmf6.write_recharge_file(tmp_path / "x.rch", layer, icpl, np.ones((1, 3)),
+                                    boundnames=["farm a", "ridge", "50% irrigated"])
+    rows = [line for line in Path(path).read_text().splitlines() if line.startswith("  1 ")
+            or line.startswith("  2 ")]
+    assert rows[0].endswith("  'farm a'")
+    assert rows[1].endswith("  ridge")
+    assert rows[2].endswith("  '50% irrigated'")
+
+
+@pytest.mark.parametrize("name, match", [
+    ("x" * 41, "at most 40"),
+    ("farmer's", "single quote"),
+    ("  ", "empty"),
+])
+def test_unreadable_boundnames_are_refused(tmp_path, name, match):
+    with pytest.raises(lmf6.MF6Error, match=match):
+        lmf6.write_recharge_file(tmp_path / "x.rch", np.array([0]), np.array([0]),
+                                 np.ones((1, 1)), boundnames=[name])

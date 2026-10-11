@@ -25,6 +25,8 @@ rest of the package does not depend on it.
 from __future__ import annotations
 
 import os
+import re
+import shlex
 import warnings
 from collections.abc import Mapping, Sequence
 
@@ -43,6 +45,9 @@ __all__ = [
 ]
 
 _DAY = pd.Timedelta(days=1)
+
+#: MODFLOW 6's LENBOUNDNAME.
+_MAX_BOUNDNAME = 40
 
 #: TDIS ``TIME_UNITS`` -> days.  LUMPREM steps whole days, so periods must
 #: come out as whole days whatever the model's unit.
@@ -314,6 +319,85 @@ def _rch_filename(gwf, pname: str) -> str:
     return f"{gwf.name}.rch"
 
 
+def _quote(token: str) -> str:
+    """``token`` as MF6 reads it whole: single-quoted if it holds whitespace."""
+    return f"'{token}'" if re.search(r"\s", token) else token
+
+
+def _boundname_tokens(boundnames: Sequence[str]) -> list[str]:
+    """Each boundname as it is written to the file, after checking MF6 can read it."""
+    out = []
+    for b in boundnames:
+        b = str(b)
+        if not b.strip():
+            raise MF6Error("a boundname is empty")
+        if len(b) > _MAX_BOUNDNAME:
+            raise MF6Error(f"boundname {b!r} is {len(b)} characters; MODFLOW 6 reads at "
+                           f"most {_MAX_BOUNDNAME}")
+        if "'" in b:
+            raise MF6Error(f"boundname {b!r} contains a single quote, which MODFLOW 6 "
+                           f"cannot read inside a name")
+        out.append(_quote(b))
+    return out
+
+
+def _register_package(gwf, ftype: str, filename: str, pname: str) -> None:
+    """List a package file in the model's name file on disk, or MF6 never reads it.
+
+    An entry for ``filename`` already there is left alone, and one for another
+    file under the same ``pname`` is pointed at ``filename``.  Otherwise the
+    entry is added at the end of the PACKAGES block.
+    """
+    sim_path = gwf.simulation.simulation_data.mfpath.get_sim_path()
+    path = os.path.join(sim_path, gwf.model_nam_file)
+    if not os.path.exists(path):
+        raise MF6Error(f"the model's name file {path} does not exist; write the "
+                       f"simulation before the RCH file")
+    with open(path) as fid:
+        lines = fid.read().splitlines()
+
+    upper = [line.strip().upper() for line in lines]
+    try:
+        begin = next(i for i, u in enumerate(upper) if re.match(r"BEGIN\s+PACKAGES\b", u))
+        end = next(i for i in range(begin + 1, len(lines))
+                   if re.match(r"END\s+PACKAGES\b", upper[i]))
+    except StopIteration:
+        raise MF6Error(f"{path} has no BEGIN/END PACKAGES block") from None
+
+    def norm(f):
+        return os.path.normcase(os.path.normpath(f))
+
+    replace, others = None, []
+    for i in range(begin + 1, end):
+        if upper[i][:1] in ("#", "!", "") or upper[i].startswith("//"):
+            continue
+        tokens = shlex.split(lines[i], comments=True)
+        if len(tokens) < 2:
+            continue
+        kind, fname = tokens[0].upper(), tokens[1]
+        name = tokens[2] if len(tokens) > 2 else None
+        if kind == ftype.upper() and norm(fname) == norm(filename):
+            return
+        if name is not None and name.lower() == pname.lower():
+            if kind != ftype.upper():
+                raise MF6Error(f"the model already has a {kind} package named {pname!r} "
+                               f"in {path}; pass another pname")
+            replace = i
+        elif kind == ftype.upper():
+            others.append(fname)
+
+    entry = f"  {ftype}  {_quote(filename)}  {pname}"
+    if replace is None:
+        lines.insert(end, entry)
+    else:
+        lines[replace] = entry
+    if others:
+        warnings.warn(f"{path} also lists {ftype} file(s) {others}; MODFLOW 6 applies "
+                      f"those as well as {filename!r}", stacklevel=3)
+    with open(path, "w", newline="\n") as fid:
+        fid.write("\n".join(lines) + "\n")
+
+
 def write_recharge_file(
     path,
     layer: np.ndarray,
@@ -333,6 +417,10 @@ def write_recharge_file(
     period block is one ``%`` substitution into a template built once, which
     writes fifty thousand cells for five hundred periods in seconds rather
     than minutes.  ``layer`` and ``icpl`` are 0-based; the file is 1-based.
+    Boundnames holding spaces are quoted, so MODFLOW reads each as one name.
+
+    This writes the package file only; MODFLOW reads it once the model's name
+    file lists it, which :func:`recharge_package` sees to.
     """
     rates = np.asarray(rates, dtype=np.float64)
     ncell = layer.size
@@ -346,7 +434,7 @@ def write_recharge_file(
     # The template is %-formatted once per period, so a literal % in a
     # boundname has to be doubled.
     names = [""] * ncell if boundnames is None else \
-        [f"  {b}".replace("%", "%%") for b in boundnames]
+        [f"  {b}".replace("%", "%%") for b in _boundname_tokens(boundnames)]
     template = "".join(f"  {lay + 1:<3d} {cell + 1:<8d} {fmt}{name}\n"
                        for lay, cell, name in zip(layer.tolist(), icpl.tolist(), names,
                                                   strict=True))
@@ -360,7 +448,7 @@ def write_recharge_file(
         if boundnames is not None:
             fid.write("  BOUNDNAMES\n")
         if obs_file:
-            fid.write(f"  OBS6  FILEIN  {obs_file}\n")
+            fid.write(f"  OBS6  FILEIN  {_quote(obs_file)}\n")
         fid.write("END options\n\n")
         fid.write(f"BEGIN dimensions\n  MAXBOUND  {ncell}\nEND dimensions\n\n")
         for k in range(rates.shape[0]):
@@ -404,13 +492,16 @@ def recharge_package(
         obs_file: an RCH OBS6 file to reference from the options block.
         save_flows, print_input: RCH options.
         method: ``"fast"`` writes the file directly with
-            :func:`write_recharge_file`; the flopy package object is not
-            touched, so a loaded RCH package, if any, no longer matches its
-            file.  ``"flopy"`` replaces the model's RCH package object with a
+            :func:`write_recharge_file` and lists it in the model's name file
+            on disk, so the simulation must already have been written.  The
+            flopy objects are not touched: a loaded RCH package, if any, no
+            longer matches its file, and a later ``sim.write_simulation()``
+            rewrites the name file without the entry -- so write the RCH file
+            last.  ``"flopy"`` replaces the model's RCH package object with a
             new ``ModflowGwfrch`` carrying the rates and, if ``write``, writes
             it -- the right choice when the simulation is written later with
-            ``sim.write()``, but minutes rather than seconds for tens of
-            thousands of cells over hundreds of periods.
+            ``sim.write_simulation()``, but minutes rather than seconds for
+            tens of thousands of cells over hundreds of periods.
         write: with ``method="flopy"``, write the package file now.
         **flopy_kwargs: passed to ``ModflowGwfrch`` with ``method="flopy"``
             -- ``observations=`` among them, since flopy builds its own OBS6
@@ -431,25 +522,33 @@ def recharge_package(
                        f"model; got {rates.shape}")
     filename = filename or _rch_filename(gwf, pname)
 
+    loaded = gwf.get_package(pname)
+    if loaded is not None and str(loaded.package_type).lower() != "rch":
+        raise MF6Error(f"the model already has a {str(loaded.package_type).upper()}6 "
+                       f"package named {pname!r}; pass another pname")
+
     if method == "fast":
-        if gwf.get_package(pname) is not None:
+        if loaded is not None:
             warnings.warn(f"the model's loaded {pname!r} package object is not updated by "
                           f"method='fast'; its file is", stacklevel=2)
         path = os.path.join(gwf.simulation.simulation_data.mfpath.get_sim_path(), filename)
-        return write_recharge_file(path, layer, icpl, rates, boundnames=boundnames,
+        path = write_recharge_file(path, layer, icpl, rates, boundnames=boundnames,
                                    save_flows=save_flows, print_input=print_input,
                                    obs_file=obs_file)
+        _register_package(gwf, "RCH6", filename, pname)
+        return path
     if method != "flopy":
         raise MF6Error(f"method must be 'fast' or 'flopy', got {method!r}")
+    if boundnames is not None:
+        _boundname_tokens(boundnames)
 
     if obs_file:
         raise MF6Error("obs_file is for method='fast'; with method='flopy' pass "
                        "observations= as ModflowGwfrch takes it")
     import flopy
 
-    old = gwf.get_package(pname)
-    if old is not None:
-        gwf.remove_package(old)
+    if loaded is not None:
+        gwf.remove_package(loaded)
     cellid = [(int(a), int(b)) for a, b in zip(layer.tolist(), icpl.tolist(), strict=True)]
     names = None if boundnames is None else [str(b) for b in boundnames]
     spd = {}
