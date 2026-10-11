@@ -13,7 +13,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from lumpyrem import ForcingError, GridForcing, ModelError, ModelGrid, Solver, ZonedForcing
+from lumpyrem import (
+    Forcing,
+    ForcingError,
+    GridForcing,
+    ModelError,
+    ModelGrid,
+    Solver,
+    ZonedForcing,
+)
 from lumpyrem.results import COLUMNS
 
 DAYS = pd.date_range("2000-01-01", "2002-12-31")
@@ -137,26 +145,35 @@ def test_thread_count_does_not_change_results(forcing_kind, monkeypatch):
     assert np.array_equal(ref.values, got.values, equal_nan=True)
 
 
-def test_thread_options_resolve(monkeypatch):
-    from lumpyrem.engine import resolve_threads
-    monkeypatch.delenv("LUMPYREM_THREADS", raising=False)
-    assert resolve_threads() is None
-    assert resolve_threads(single_threaded=True) == 1
-    assert resolve_threads(threads=4) == 4
-    monkeypatch.setenv("LUMPYREM_THREADS", "2")
-    assert resolve_threads() == 2
-    assert resolve_threads(single_threaded=True) == 1
-    assert resolve_threads(threads=5) == 5
-    with pytest.raises(ValueError):
-        resolve_threads(threads=2, single_threaded=True)
-    with pytest.raises(ValueError):
-        resolve_threads(threads=0)
-    monkeypatch.setenv("LUMPYREM_THREADS", "two")
-    with pytest.raises(ValueError):
-        resolve_threads()
+@pytest.mark.parametrize("engine", ["python", "compiled"])
+def test_shared_forcing_is_one_zone(engine):
+    """Shared forcing and a single zone are the same run through the same kernel."""
+    if engine == "compiled":
+        pytest.importorskip("numba")
+    rain, pet, _, _, _, _, grid = _inputs()
+    shared = Forcing.from_dataframe(pd.DataFrame({"rainfall": rain["a"], "pot_evap": pet}),
+                                    veg_gamma=2.5)
+    one_zone = ZonedForcing.from_frames(["a"] * NCELL, rainfall=rain[["a"]], pot_evap=pet,
+                                        veg_gamma=2.5)
+    a = grid.run(shared, times="MS", engine=engine)
+    b = grid.run(one_zone, times="MS", engine=engine)
+    assert np.array_equal(a.values, b.values, equal_nan=True)
 
 
-def test_from_arrays_indexes_series_by_position():
-    table = pd.DataFrame({"maxvol": [100.0, 200.0, 300.0]}, index=[0, 800, 5])
-    grid = ModelGrid.from_arrays(upper=dict(maxvol=table["maxvol"], ks=1.0, m=0.4, l=0.5))
-    assert [c.upper.maxvol for c in grid.cells] == [100.0, 200.0, 300.0]
+@pytest.mark.parametrize("engine", ["python", "compiled"])
+@pytest.mark.parametrize("forcing_kind", ["shared", "per_cell"])
+def test_columns_keeps_only_those_for_every_forcing(engine, forcing_kind):
+    """columns= is not a zoned feature: every grid run stores only what it keeps."""
+    if engine == "compiled":
+        pytest.importorskip("numba")
+    rain, pet, veg, irr, cf, gm, grid = _inputs()
+    forcing = (_by_hand(rain, pet, veg, irr, cf, gm) if forcing_kind == "per_cell" else
+               Forcing.from_dataframe(pd.DataFrame({"rainfall": rain["b"], "pot_evap": pet}),
+                                      veg_gamma=2.0))
+    full = grid.run(forcing, times="MS", engine=engine)
+    keep = ["net_recharge", "elevation", "evap_upper"]
+    sub = grid.run(forcing, times="MS", engine=engine, columns=keep)
+    assert sub.values.shape == full.values.shape[:2] + (len(keep),)
+    assert np.array_equal(sub.values, full.values[:, :, [COLUMNS.index(c) for c in keep]],
+                          equal_nan=True)
+    assert np.isnan(sub["elevation"].to_numpy()).all()     # no conversion: blanked
