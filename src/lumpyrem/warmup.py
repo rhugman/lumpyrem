@@ -26,18 +26,16 @@ points ``NUMBA_CACHE_DIR`` at one shared cache warmed with ``--cache-dir``.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
 __all__ = ["WarmupReport", "cache_dir", "compile_kernels", "main"]
-
-#: A fresh process slower than this to make its first calls is taken to have
-#: compiled rather than loaded from the cache.
-RECOMPILE_SECONDS = 5.0
 
 _PACKAGE_PARENT = str(Path(__file__).resolve().parents[1])
 
@@ -54,6 +52,10 @@ class WarmupReport:
             is on disk; ``None`` unless asked for.
         cache: the cache directory.
         threads: threads Numba runs a parallel grid on.
+        kernels: for each compiled kernel the new process called, Numba's
+            count of ``(cache hits, cache misses)``; ``None`` unless asked
+            for.  Kernels called only from inside other kernels are compiled
+            into them and do not appear.
     """
 
     first: float
@@ -61,21 +63,37 @@ class WarmupReport:
     fresh: float | None
     cache: str
     threads: int
+    kernels: Mapping[str, tuple[int, int]] | None = None
+
+    @property
+    def recompiled(self) -> list[str]:
+        """Kernels the new process compiled rather than loaded from the cache."""
+        return sorted(name for name, (hits, misses) in (self.kernels or {}).items()
+                      if misses or not hits)
 
     @property
     def cached(self) -> bool | None:
-        """Whether a new process loads the kernels rather than compiling them."""
-        return None if self.fresh is None else self.fresh <= RECOMPILE_SECONDS
+        """Whether a new process loads every kernel from the cache.
+
+        Numba's own cache statistics decide, not the clock, so the answer does
+        not depend on how busy the machine is.
+        """
+        if self.kernels is None:
+            return None
+        return bool(self.kernels) and not self.recompiled
 
     def __str__(self) -> str:
         lines = [f"cache: {self.cache}  ({self.threads} threads)",
                  f"first calls (compile, or load from cache): {self.first:6.2f} s",
                  f"second calls (in memory):                  {self.second:6.2f} s"]
         if self.fresh is not None:
-            lines.append(f"fresh process, first calls:                {self.fresh:6.2f} s  "
-                         + ("(loaded from cache)" if self.cached else
-                            "(slow enough to be a recompile: is the cache writable, and "
-                            "is NUMBA_CACHE_DIR the same for every run?)"))
+            lines.append(f"fresh process, first calls:                {self.fresh:6.2f} s")
+        if self.kernels is not None:
+            lines.append(f"fresh process loaded {len(self.kernels)} kernel(s) from the cache"
+                         if self.cached else
+                         f"fresh process compiled {self.recompiled or 'no kernels'} instead "
+                         f"of loading from the cache: is the cache writable, and is "
+                         f"NUMBA_CACHE_DIR the same for every run?")
         return "\n".join(lines)
 
 
@@ -125,11 +143,27 @@ def _exercise() -> None:
     grid[0].run(shared, times="MS")
 
 
-def _fresh_process_seconds() -> float:
-    """Time the first calls in a new interpreter, importing this same copy."""
-    code = ("import time; t = time.perf_counter(); "
-            "from lumpyrem.warmup import _exercise; _exercise(); "
-            "print(time.perf_counter() - t)")
+def _kernel_cache_stats() -> dict[str, tuple[int, int]]:
+    """``(cache hits, cache misses)`` for each compiled kernel this process called."""
+    from . import compiled
+
+    out = {}
+    for name, obj in vars(compiled).items():
+        stats = getattr(obj, "stats", None)
+        if stats is None or not hasattr(obj, "py_func"):
+            continue
+        hits, misses = sum(stats.cache_hits.values()), sum(stats.cache_misses.values())
+        if obj.signatures or hits or misses:
+            out[name] = (hits, misses)
+    return out
+
+
+def _fresh_process() -> tuple[float, dict[str, tuple[int, int]]]:
+    """The first calls in a new interpreter importing this same copy: their time,
+    and what Numba says each kernel did."""
+    code = ("import json, time; t = time.perf_counter(); "
+            "from lumpyrem.warmup import _exercise, _kernel_cache_stats; _exercise(); "
+            "print(json.dumps([time.perf_counter() - t, _kernel_cache_stats()]))")
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join(filter(None, [_PACKAGE_PARENT,
                                                       env.get("PYTHONPATH")]))
@@ -137,7 +171,8 @@ def _fresh_process_seconds() -> float:
                          env=env, cwd=_PACKAGE_PARENT)
     if out.returncode != 0:
         raise RuntimeError(f"the fresh-process check failed:\n{out.stderr}")
-    return float(out.stdout.strip().splitlines()[-1])
+    seconds, kernels = json.loads(out.stdout.strip().splitlines()[-1])
+    return float(seconds), {name: tuple(v) for name, v in kernels.items()}
 
 
 def compile_kernels(*, check: bool = False, cache: str | os.PathLike | None = None
@@ -145,8 +180,9 @@ def compile_kernels(*, check: bool = False, cache: str | os.PathLike | None = No
     """Compile every kernel a run uses and save it to the Numba cache.
 
     Args:
-        check: also start a new Python process and time its first calls, to
-            confirm the kernels now load from disk rather than compile.
+        check: also start a new Python process and make its first calls, to
+            confirm from Numba's cache statistics that every kernel now loads
+            from disk rather than compiles.
         cache: a cache directory to use, as ``NUMBA_CACHE_DIR``.  Numba reads
             that variable when it is first imported, so this works only
             before anything has imported Numba; otherwise set the variable
@@ -181,16 +217,16 @@ def compile_kernels(*, check: bool = False, cache: str | os.PathLike | None = No
     t0 = time.perf_counter()
     _exercise()
     second = time.perf_counter() - t0
-    fresh = _fresh_process_seconds() if check else None
+    fresh, kernels = _fresh_process() if check else (None, None)
     return WarmupReport(first=first, second=second, fresh=fresh, cache=cache_dir(),
-                        threads=int(numba.config.NUMBA_NUM_THREADS))
+                        threads=int(numba.config.NUMBA_NUM_THREADS), kernels=kernels)
 
 
 def main(argv=None) -> int:
     """``python -m lumpyrem.warmup`` / ``lumpyrem-compile``.
 
     Exit status 0 when the kernels are cached, 1 when Numba is missing, 2 when
-    a fresh process still appears to compile.
+    a fresh process still compiles a kernel.
     """
     parser = argparse.ArgumentParser(
         prog="lumpyrem-compile",
@@ -199,7 +235,7 @@ def main(argv=None) -> int:
                         help="cache directory (sets NUMBA_CACHE_DIR); point every "
                              "PEST++ worker at the same one")
     parser.add_argument("--no-check", action="store_true",
-                        help="skip timing a fresh process against the cache")
+                        help="skip checking that a fresh process loads from the cache")
     args = parser.parse_args(argv)
 
     from . import __version__

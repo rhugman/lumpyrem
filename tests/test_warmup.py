@@ -1,4 +1,9 @@
-"""lumpyrem.warmup: every kernel compiles, and a new process loads it from the cache."""
+"""lumpyrem.warmup: every kernel compiles, and a new process loads it from the cache.
+
+Nothing here times anything: on a shared CI runner the clock says more about
+the neighbours than about the cache.  Numba's own cache statistics say what
+each kernel did; the timings are only reported.
+"""
 
 from __future__ import annotations
 
@@ -9,18 +14,11 @@ from lumpyrem import warmup
 pytest.importorskip("numba")
 
 
-def test_compile_kernels_runs_every_entry_point():
-    report = warmup.compile_kernels()
-    assert report.fresh is None and report.cached is None
-    assert report.second <= report.first + 1.0
-    assert report.threads >= 1
-    assert report.cache == warmup.cache_dir()
-
-
-def test_fresh_process_loads_from_cache():
+def test_fresh_process_loads_every_kernel_from_the_cache():
     report = warmup.compile_kernels(check=True)
-    assert report.fresh is not None
-    assert report.cached, str(report)
+    assert report.kernels, "the fresh process called no compiled kernel"
+    assert not report.recompiled, str(report)
+    assert report.cached
 
 
 def test_main_reports_and_exits_zero(capsys):
