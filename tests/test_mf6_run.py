@@ -124,7 +124,7 @@ def _cell_areas(gwf, icpl):
     return np.array(areas)
 
 
-@pytest.mark.parametrize("method", ["fast", "flopy"])
+@pytest.mark.parametrize("method", ["fast", "flopy", "flopy-now"])
 def test_modflow_budget_matches_rates(tmp_path, mf6_exe, method):
     sim, gwf = _build(tmp_path, mf6_exe)
     cells, rates = _rates(sim, gwf)
@@ -139,12 +139,17 @@ def test_modflow_budget_matches_rates(tmp_path, mf6_exe, method):
                       f"  rch_obs  rch  '{OBS_NAME}'\nEND continuous\n")
         lmf6.recharge_package(gwf, cells, rates, boundnames=names, method="fast",
                               obs_file="m.rch.obs")
-    else:
+    elif method == "flopy":
         # The documented order: build the package object, then write it all.
         lmf6.recharge_package(gwf, cells, rates, boundnames=names, method="flopy",
                               write=False,
                               observations={obs_csv: [("rch_obs", "rch", OBS_NAME)]})
         sim.write_simulation(silent=True)
+    else:
+        # A simulation already on disk, given its RCH package afterwards.
+        sim.write_simulation(silent=True)
+        lmf6.recharge_package(gwf, cells, rates, boundnames=names, method="flopy",
+                              observations={obs_csv: [("rch_obs", "rch", OBS_NAME)]})
 
     success, buff = sim.run_simulation(silent=True, report=True)
     assert success, "MODFLOW 6 failed:\n" + "\n".join(buff[-20:])

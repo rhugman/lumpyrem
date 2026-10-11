@@ -65,7 +65,9 @@ A groundwater model can have tens of thousands of recharge cells but only a
 handful of rain gauges, farms or irrigation districts. `ZonedForcing` holds
 forcing once per zone, and can take vegetation the LUMPREM way: a class
 calendar per zone, and a crop factor and gamma per class for each cell.
-`columns=` keeps only the output a run needs.
+Every grid run goes through the same zoned kernel -- per-cell forcing is one
+zone per cell, shared forcing a single zone -- so `columns=` keeps only the
+output a run needs whatever the forcing.
 
 ```python
 import lumpyrem.mf6 as lmf6
@@ -84,8 +86,16 @@ results = grid.run(forcing, times=lmf6.output_times(periods, "1960-01-01"),
                    start="1960-01-01", end=periods["end"].iloc[-1] - pd.Timedelta(days=1),
                    columns=["net_recharge"])
 rates = lmf6.period_rates(results, periods, factor=0.001)   # (nper, ncell), m/day
-lmf6.recharge_package(gwf, cells, rates, boundnames=names)  # writes the RCH file
+lmf6.recharge_package(gwf, cells, rates, boundnames=names, write=False)
+sim.write_simulation()                                      # RCH with everything else
 ```
+
+`recharge_package` builds a flopy `ModflowGwfrch` by default. For a large
+grid on a simulation already written, `method="fast"` writes the same RCH
+file directly and lists it in the model's name file: about 30 times faster
+(18 s against 9 minutes for 50,000 cells over 550 periods, with MODFLOW's
+budget matching the rates either way; `scripts/benchmark_rch.py`).  Write it
+last, since `sim.write_simulation()` rewrites the name file.
 
 ### Threads, and parallel calibration
 
@@ -111,10 +121,6 @@ python -m lumpyrem.warmup --cache-dir /shared  # one cache for every PEST++ work
 
 The cache is keyed on where the package lives, so workers that each hold their
 own copy of lumpyrem should share one `NUMBA_CACHE_DIR`.
-
-`recharge_package` writes the list-based RCH file directly by default, which
-is seconds rather than minutes for a large grid; `method="flopy"` builds a
-`ModflowGwfrch` object instead.
 
 ### Examples
 
