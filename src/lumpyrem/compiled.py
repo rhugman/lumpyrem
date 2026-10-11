@@ -32,7 +32,7 @@ from __future__ import annotations
 from math import exp
 
 import numpy as np
-from numba import njit, prange
+from numba import config, get_num_threads, njit, prange, set_num_threads
 
 from .core import COLUMNS, ELEVATION_FLOOR, Simulation
 from .engine import (
@@ -526,6 +526,21 @@ def _row(a, c):
     return a[c] if a.shape[0] > 1 else a[0]
 
 
+# Each multi-cell kernel comes as a parallel loop and a serial one over the
+# same per-cell function.  The serial loop is what ``threads=1`` runs: no
+# parallel region, so Numba never starts its thread pool -- the setting for
+# PEST workers, each of which should hold one core and no more.
+
+@njit(**_JIT)
+def _one_cell(c, params, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
+              gwirrigfrac, epot_br, outdays, nstep, mxiter, tol, values, nonconv):
+    """Cell ``c`` of :func:`_simulate_cells`."""
+    _simulate_cell(params[c], rbuf[c], mbuf[c], _row(rain, c), _row(epot, c),
+                   _row(cropfac, c), _row(gamma, c), _row(irrigcode, c),
+                   _row(gwirrigfrac, c), _row(epot_br, c), outdays, nstep,
+                   mxiter, tol, values[c], nonconv[c])
+
+
 @njit(parallel=True, **_JIT)
 def _simulate_cells(params, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
                     gwirrigfrac, epot_br, outdays, nstep, mxiter, tol,
@@ -536,10 +551,18 @@ def _simulate_cells(params, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
     ``(ncell, ntime)``, one row per cell.
     """
     for c in prange(params.shape[0]):
-        _simulate_cell(params[c], rbuf[c], mbuf[c], _row(rain, c), _row(epot, c),
-                       _row(cropfac, c), _row(gamma, c), _row(irrigcode, c),
-                       _row(gwirrigfrac, c), _row(epot_br, c), outdays, nstep,
-                       mxiter, tol, values[c], nonconv[c])
+        _one_cell(c, params, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
+                  gwirrigfrac, epot_br, outdays, nstep, mxiter, tol, values, nonconv)
+
+
+@njit(**_JIT)
+def _simulate_cells_serial(params, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
+                           gwirrigfrac, epot_br, outdays, nstep, mxiter, tol,
+                           values, nonconv):
+    """:func:`_simulate_cells` on the calling thread alone."""
+    for c in range(params.shape[0]):
+        _one_cell(c, params, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
+                  gwirrigfrac, epot_br, outdays, nstep, mxiter, tol, values, nonconv)
 
 
 # ---------------------------------------------------------------------------
@@ -584,9 +607,28 @@ def simulate(
     )
 
 
+def _run_loop(threads, parallel, serial, *args):
+    """Run a multi-cell kernel on ``threads`` threads: the serial loop for one,
+    the parallel loop under ``numba.set_num_threads`` for more, and every
+    thread Numba has for ``None``."""
+    if threads == 1:
+        serial(*args)
+        return
+    if threads is None:
+        parallel(*args)
+        return
+    previous = get_num_threads()
+    set_num_threads(min(int(threads), config.NUMBA_NUM_THREADS))
+    try:
+        parallel(*args)
+    finally:
+        set_num_threads(previous)
+
+
 def simulate_cells(
     params: np.ndarray, *, rbuf=None, mbuf=None, nstep, mxiter, tol,
     rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br=None, outdays,
+    threads: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Run ``params.shape[0]`` independent cells in parallel.
 
@@ -597,6 +639,10 @@ def simulate_cells(
     each has its own.  Returns ``values`` of shape ``(ncell, nrows, 26)`` and
     the ``(ncell, 2)`` non-convergence counts.  ``engine.run_cells`` is the
     entry point that also falls back to ``core``.
+
+    ``threads`` caps the threads used: ``1`` runs the cells one after another
+    on the calling thread and never starts Numba's thread pool, ``None`` uses
+    every thread Numba has (``NUMBA_NUM_THREADS``, all cores by default).
     """
     params = np.ascontiguousarray(params, dtype=np.float64)
     assert params.ndim == 2 and params.shape[1] == NPARAM, params.shape
@@ -618,6 +664,7 @@ def simulate_cells(
         _simulate_cell(params[0], rbuf[0], mbuf[0], *(a[0] for a in forcing), outdays,
                        int(nstep), int(mxiter), float(tol), values[0], nonconv[0])
     else:
-        _simulate_cells(params, rbuf, mbuf, *forcing, outdays, int(nstep), int(mxiter),
-                        float(tol), values, nonconv)
+        _run_loop(threads, _simulate_cells, _simulate_cells_serial,
+                  params, rbuf, mbuf, *forcing, outdays, int(nstep), int(mxiter),
+                  float(tol), values, nonconv)
     return values, nonconv
