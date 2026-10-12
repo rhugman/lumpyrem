@@ -175,7 +175,7 @@ class CellRun:
     """What the kernel returns for a set of cells sharing one output schedule."""
 
     days: np.ndarray            # int64, (nrows,), 0 first
-    values: np.ndarray          # float64, (ncell, nrows, 26)
+    values: np.ndarray          # float64, (ncell, nrows, ncolumn): the columns kept
     nonconverged: np.ndarray    # int64, (ncell, 2): upper, lower
 
 
@@ -189,19 +189,44 @@ def run_cells(
     nstep: int,
     mxiter: int,
     tol: float,
+    zone: np.ndarray | None = None,
+    vegclass: np.ndarray | None = None,
+    cropfac_table: np.ndarray | None = None,
+    gamma_table: np.ndarray | None = None,
+    columns: Sequence[int] | None = None,
     engine: str = "auto",
     threads: int | None = None,
 ) -> CellRun:
     """Run ``params.shape[0]`` independent cells.
+
+    Every cell reads its forcing through a zone: each variable is
+    ``(1, ntime)``, shared by every cell, or ``(nzone, ntime)``, and cell
+    ``c`` reads row ``zone[c]``.  Without ``zone`` each cell is its own zone,
+    so ``(ncell, ntime)`` forcing is one row per cell.  Holding forcing per
+    zone sizes it by the number of zones rather than the number of cells,
+    which is what makes a grid of tens of thousands of cells over decades of
+    days fit in memory.
 
     Args:
         params: ``(ncell, NPARAM)`` rows from :func:`param_row`.
         rbuf, mbuf: ``(ncell, width + 1)`` initial buffers from
             :func:`buffer_rows`.
         forcing: every name in :data:`FORCING`, each ``(1, ntime)`` or
-            ``(ncell, ntime)``.
+            ``(nzone, ntime)``.
         outdays: 1-based output days, shared by every cell.
         nstep, mxiter, tol: solver settings, shared by every cell.
+        zone: ``(ncell,)`` 0-based row index into the forcing; the identity
+            when omitted.
+        vegclass: optional ``(1 | nzone, ntime)`` integer vegetation-class
+            codes.  With it, cell ``c`` takes its crop factor and gamma on day
+            ``t`` from ``cropfac_table[c, k]`` and ``gamma_table[c, k]``,
+            ``k = vegclass[zone[c], t]``, and ``forcing["cropfac"]`` and
+            ``forcing["gamma"]`` are not read.
+        cropfac_table, gamma_table: ``(ncell, nclass)``, required with
+            ``vegclass``.
+        columns: kernel column indices to keep; all of them by default.
+            ``values`` is then ``(ncell, nrows, len(columns))``, and the rest
+            are never stored.
         engine: ``"auto"``, ``"compiled"`` or ``"python"``.
         threads: threads for the compiled engine, from
             :func:`resolve_threads`; ``1`` never starts the Numba thread
@@ -211,10 +236,14 @@ def run_cells(
     assert params.shape == (ncell, NPARAM), params.shape
     assert rbuf.shape[0] == ncell and mbuf.shape[0] == ncell, (rbuf.shape, mbuf.shape)
     assert set(forcing) == set(FORCING), sorted(forcing)
+    zone = (np.arange(ncell, dtype=np.int64) if zone is None
+            else np.ascontiguousarray(zone, dtype=np.int64))
+    assert zone.shape == (ncell,), zone.shape
+    if not (vegclass is None) == (cropfac_table is None) == (gamma_table is None):
+        raise ValueError("vegclass, cropfac_table and gamma_table go together")
     ntime = forcing["rain"].shape[1]
-    for name in FORCING:
-        shape = forcing[name].shape
-        assert shape in ((1, ntime), (ncell, ntime)), (name, shape)
+    columns = (np.arange(len(core.COLUMNS), dtype=np.int64) if columns is None
+               else np.ascontiguousarray(columns, dtype=np.int64))
     outdays = np.ascontiguousarray(outdays, dtype=np.int64)
     n = nrows(outdays, ntime)
     days = np.concatenate(([0], np.minimum(outdays[: n - 1], ntime))).astype(np.int64)
@@ -222,15 +251,18 @@ def run_cells(
     if resolve(engine) == "compiled":
         from . import compiled
         values, nonconv = compiled.simulate_cells(
-            params, rbuf=rbuf, mbuf=mbuf, **forcing, outdays=outdays,
-            nstep=nstep, mxiter=mxiter, tol=tol, threads=threads)
+            params, zone=zone, rbuf=rbuf, mbuf=mbuf, **forcing, vegclass=vegclass,
+            cropfac_table=cropfac_table, gamma_table=gamma_table, outdays=outdays,
+            nstep=nstep, mxiter=mxiter, tol=tol, columns=columns, threads=threads)
     else:
-        values, nonconv = _run_python(params, rbuf, mbuf, forcing, outdays,
-                                      nstep, mxiter, tol, n)
+        values, nonconv = _run_python(params, rbuf, mbuf, zone, forcing, vegclass,
+                                      cropfac_table, gamma_table, outdays, nstep, mxiter,
+                                      tol, n, columns)
     return CellRun(days=days, values=values, nonconverged=nonconv)
 
 
-def _run_python(params, rbuf, mbuf, forcing, outdays, nstep, mxiter, tol, n):
+def _run_python(params, rbuf, mbuf, zone, forcing, vegclass, cropfac_table, gamma_table,
+                outdays, nstep, mxiter, tol, n, columns):
     """``core.simulate`` once per cell.
 
     Forcing goes in as lists of Python floats: ``**`` and ``exp`` reach libm by
@@ -238,11 +270,15 @@ def _run_python(params, rbuf, mbuf, forcing, outdays, nstep, mxiter, tol, n):
     measured on the Python ones.
     """
     ncell = params.shape[0]
-    values = np.empty((ncell, n, len(core.COLUMNS)))
+    values = np.empty((ncell, n, columns.size))
     nonconv = np.zeros((ncell, 2), dtype=np.int64)
     for c in range(ncell):
-        row = {name: forcing[name][c if forcing[name].shape[0] > 1 else 0].tolist()
-               for name in FORCING}
+        z = int(zone[c])
+        row = {name: a[z if a.shape[0] > 1 else 0] for name, a in forcing.items()}
+        if vegclass is not None:
+            k = vegclass[z if vegclass.shape[0] > 1 else 0]
+            row["cropfac"] = cropfac_table[c][k]
+            row["gamma"] = gamma_table[c][k]
         # Each cell's own buffer, without the padding to the widest cell, so
         # that core sizes its arrays to this cell alone.  Exact either way.
         sim = core.simulate(
@@ -250,8 +286,8 @@ def _run_python(params, rbuf, mbuf, forcing, outdays, nstep, mxiter, tol, n):
             rbuf=np.trim_zeros(rbuf[c, 1:], "b").tolist(),
             mbuf=np.trim_zeros(mbuf[c, 1:], "b").tolist(),
             nstep=int(nstep), mxiter=int(mxiter), tol=float(tol),
-            **row, outdays=outdays.tolist(),
+            **{name: a.tolist() for name, a in row.items()}, outdays=outdays.tolist(),
         )
-        values[c] = sim.values
+        values[c] = sim.values[:, columns]
         nonconv[c] = (sim.nonconverged_upper, sim.nonconverged_lower)
     return values, nonconv

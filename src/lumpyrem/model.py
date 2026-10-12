@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 
 from . import engine as _engine
-from .forcing import Forcing, GridForcing
+from .forcing import Forcing, GridForcing, ZonedForcing
 from .parameters import (
     InitialState,
     LowerStore,
@@ -294,15 +294,21 @@ class ModelGrid:
 
     # ------------------------------------------------------------------
     def run(self, forcing, *, times=None, start=None, end=None, engine: str = "auto",
-            threads: int | None = None, single_threaded: bool | None = None,
-            **forcing_kwargs) -> GridResults:
+            columns: Sequence[str] | None = None, threads: int | None = None,
+            single_threaded: bool | None = None, **forcing_kwargs) -> GridResults:
         """Run every cell and return results on ``(time, cell, variable)``.
 
         Args:
             forcing: shared by every cell -- anything :meth:`Model.run` takes
-                -- or a :class:`~lumpyrem.forcing.GridForcing` with one column
-                per cell.
+                -- a :class:`~lumpyrem.forcing.GridForcing` with one column
+                per cell, or a :class:`~lumpyrem.forcing.ZonedForcing` with
+                one column per zone and a zone for each cell.
             times, start, end, engine: as for :meth:`Model.run`.
+            columns: output columns to keep, all of them by default.  A large
+                grid reported often is mostly columns nobody reads: 50,000
+                cells at 550 stress periods is 5.7 GB with all 26 and 0.2 GB
+                with ``columns=["net_recharge"]``.  The others are never
+                stored.
             threads: how many threads the compiled engine may use.  ``None``
                 (the default) takes the ``LUMPYREM_THREADS`` environment
                 variable if set, and otherwise every thread Numba has.
@@ -317,13 +323,15 @@ class ModelGrid:
         Returns:
             :class:`~lumpyrem.results.GridResults`.
         """
+        keep = _column_indices(columns)
         try:
             nthread = _engine.resolve_threads(threads, single_threaded)
         except ValueError as exc:
             raise ModelError(str(exc)) from None
-        if isinstance(forcing, GridForcing):
+        if isinstance(forcing, ZonedForcing | GridForcing):
+            kind = type(forcing).__name__
             if forcing_kwargs:
-                raise ModelError("options cannot be applied to an existing GridForcing")
+                raise ModelError(f"options cannot be applied to an existing {kind}")
             if forcing.ncell != self.ncell:
                 raise ModelError(f"the forcing has {forcing.ncell} cells and the grid "
                                  f"has {self.ncell}")
@@ -336,26 +344,53 @@ class ModelGrid:
         else:
             forcing = Forcing.coerce(forcing, **forcing_kwargs)
         start, ndays = _run_window(forcing, start, end)
-        daily = forcing.to_daily(start, start + (ndays - 1) * _DAY)
+        last = start + (ndays - 1) * _DAY
         outdays = _output_days(times, start, ndays)
+        if isinstance(forcing, ZonedForcing):
+            daily, vegclass = forcing.to_daily(start, last)
+            zoning = dict(
+                zone=forcing.cell_zone,
+                vegclass=None if vegclass is None else np.ascontiguousarray(vegclass.T),
+                cropfac_table=forcing.crop_factor_table,
+                gamma_table=forcing.veg_gamma_table)
+        else:
+            daily, zoning = forcing.to_daily(start, last), {}
         run = _run_kernel(self.cells, _kernel_forcing(daily), outdays, self.solver, engine,
-                          threads=nthread)
+                          threads=nthread, columns=keep, **zoning)
+        return self._results(start, run.days, run.values, run.nonconverged, keep)
 
+    def _results(self, start, days, values, nonconverged, keep) -> GridResults:
         results = GridResults(
-            times=_stamps(start, run.days),
-            days=run.days,
-            values=run.values.transpose(1, 0, 2),
+            times=_stamps(start, days),
+            days=days,
+            values=values.transpose(1, 0, 2),
             cells=self.names,
-            nonconverged=run.nonconverged,
+            nonconverged=nonconverged,
             has_elevation=np.array([c.elevation is not None for c in self.cells]),
+            columns=COLUMNS if keep is None else tuple(COLUMNS[k] for k in keep),
         )
         if not results.converged:
             failed = results.nonconverged_cells
-            upper, lower = (int(v) for v in run.nonconverged.sum(axis=0))
+            upper, lower = (int(v) for v in nonconverged.sum(axis=0))
             _report_convergence(self.solver, upper, lower,
                                 where=f" across {len(failed)} of {self.ncell} cells "
                                       f"(first: {failed[0]!r})")
         return results
+
+
+def _column_indices(columns) -> list[int] | None:
+    """Positions of the named output columns, or ``None`` for all of them."""
+    if columns is None:
+        return None
+    if isinstance(columns, str):
+        columns = [columns]
+    unknown = [c for c in columns if c not in COLUMNS]
+    if unknown:
+        raise ModelError(f"unknown output column(s) {unknown}; available columns are "
+                         f"{list(COLUMNS)}")
+    if not columns:
+        raise ModelError("columns is empty; pass None to keep every column")
+    return [COLUMNS.index(c) for c in columns]
 
 
 def _count_cells(groups: Mapping[str, Mapping | None], names, ncell) -> int:
@@ -476,20 +511,27 @@ def _kernel_forcing(daily: Mapping[str, np.ndarray]) -> dict[str, np.ndarray]:
 
 
 def _run_kernel(models: Sequence[Model], forcing, outdays, solver: Solver,
-                engine: str, threads: int | None = None) -> _engine.CellRun:
-    """Pack the models into rows, run them, and blank what has no conversion."""
+                engine: str, threads: int | None = None,
+                columns: Sequence[int] | None = None, **zoning) -> _engine.CellRun:
+    """Pack the models into rows, run them, and blank what has no conversion.
+
+    ``zoning`` -- ``zone``, ``vegclass``, ``cropfac_table``, ``gamma_table`` --
+    goes to :func:`lumpyrem.engine.run_cells` as it is.  ``columns`` are the
+    kernel columns to keep, all of them for ``None``.
+    """
     if engine not in _engine.ENGINES:
         raise ModelError(f"engine must be one of {list(_engine.ENGINES)}, got {engine!r}")
     params = np.stack([_engine.param_row(**_kernel_params(m)) for m in models])
     rbuf = _engine.buffer_rows([m.initial.drain_buffer for m in models])
     mbuf = _engine.buffer_rows([m.initial.macro_buffer for m in models])
     run = _engine.run_cells(params, rbuf, mbuf, forcing, outdays, nstep=solver.nstep,
-                            mxiter=solver.mxiter, tol=solver.tol, engine=engine,
-                            threads=threads)
+                            mxiter=solver.mxiter, tol=solver.tol, columns=columns,
+                            engine=engine, threads=threads, **zoning)
+    kept = range(len(COLUMNS)) if columns is None else columns
+    blank = [j for j, k in enumerate(kept) if k in (_ELEV, _DWT)]
     for i, model in enumerate(models):
         if model.elevation is None:
-            run.values[i, :, _ELEV] = np.nan
-            run.values[i, :, _DWT] = np.nan
+            run.values[i, :, blank] = np.nan
     return run
 
 

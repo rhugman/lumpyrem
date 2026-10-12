@@ -526,43 +526,84 @@ def _row(a, c):
     return a[c] if a.shape[0] > 1 else a[0]
 
 
-# Each multi-cell kernel comes as a parallel loop and a serial one over the
-# same per-cell function.  The serial loop is what ``threads=1`` runs: no
-# parallel region, so Numba never starts its thread pool -- the setting for
-# PEST workers, each of which should hold one core and no more.
+# Every grid run goes through one kernel family.  A cell reads each forcing
+# variable from row ``zone[c]``: per-cell forcing is the identity zoning,
+# shared forcing is a single row every cell reads, and zoned forcing holds a
+# row per zone.  One family is one set of kernels to keep bit-identical.
+#
+# Each comes as a parallel loop and a serial one over the same per-cell
+# function.  The serial loop is what ``threads=1`` runs: no parallel region,
+# so Numba never starts its thread pool -- the setting for PEST workers, each
+# of which should hold one core and no more.
 
 @njit(**_JIT)
-def _one_cell(c, params, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
-              gwirrigfrac, epot_br, outdays, nstep, mxiter, tol, values, nonconv):
-    """Cell ``c`` of :func:`_simulate_cells`."""
-    _simulate_cell(params[c], rbuf[c], mbuf[c], _row(rain, c), _row(epot, c),
-                   _row(cropfac, c), _row(gamma, c), _row(irrigcode, c),
-                   _row(gwirrigfrac, c), _row(epot_br, c), outdays, nstep,
-                   mxiter, tol, values[c], nonconv[c])
+def _one_cell(c, params, rbuf, mbuf, zone, rain, epot, cropfac, gamma, irrigcode,
+              gwirrigfrac, epot_br, vegclass, cropfac_table, gamma_table, use_tables,
+              outdays, nstep, mxiter, tol, columns, all_columns, values, nonconv):
+    """Cell ``c`` of :func:`_simulate_cells`.
+
+    With ``use_tables``, the per-cell crop factor and gamma are copied out of
+    the tables, so the arithmetic ``_simulate_cell`` sees is exactly that of a
+    run given those arrays directly.  Only the ``columns`` asked for are kept;
+    with ``all_columns`` the cell writes straight into its output.
+    """
+    ntime = rain.shape[1]
+    z = zone[c]
+    if use_tables:
+        cls = _row(vegclass, z)
+        cf = np.empty(ntime)
+        gm = np.empty(ntime)
+        for t in range(ntime):
+            k = cls[t]
+            cf[t] = cropfac_table[c, k]
+            gm[t] = gamma_table[c, k]
+    else:
+        cf = _row(cropfac, z)
+        gm = _row(gamma, z)
+    if all_columns:
+        _simulate_cell(params[c], rbuf[c], mbuf[c], _row(rain, z), _row(epot, z), cf, gm,
+                       _row(irrigcode, z), _row(gwirrigfrac, z), _row(epot_br, z),
+                       outdays, nstep, mxiter, tol, values[c], nonconv[c])
+        return
+    nrow = values.shape[1]
+    full = np.empty((nrow, NCOLUMN))
+    _simulate_cell(params[c], rbuf[c], mbuf[c], _row(rain, z), _row(epot, z), cf, gm,
+                   _row(irrigcode, z), _row(gwirrigfrac, z), _row(epot_br, z),
+                   outdays, nstep, mxiter, tol, full, nonconv[c])
+    for r in range(nrow):
+        for j in range(columns.shape[0]):
+            values[c, r, j] = full[r, columns[j]]
 
 
 @njit(parallel=True, **_JIT)
-def _simulate_cells(params, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
-                    gwirrigfrac, epot_br, outdays, nstep, mxiter, tol,
-                    values, nonconv):
+def _simulate_cells(params, rbuf, mbuf, zone, rain, epot, cropfac, gamma, irrigcode,
+                    gwirrigfrac, epot_br, vegclass, cropfac_table, gamma_table, use_tables,
+                    outdays, nstep, mxiter, tol, columns, all_columns, values, nonconv):
     """Independent cells under ``prange``, sharing solver settings and schedule.
 
     Each forcing array is ``(1, ntime)``, shared by every cell, or
-    ``(ncell, ntime)``, one row per cell.
+    ``(nzone, ntime)``, and cell ``c`` reads row ``zone[c]``.  When
+    ``use_tables`` is set, a cell's crop factor and gamma on day ``t`` are
+    ``cropfac_table[c, k]`` and ``gamma_table[c, k]`` with ``k`` its zone's
+    ``vegclass`` that day -- per-cell vegetation parameters switched by a
+    per-zone class calendar -- and ``cropfac``/``gamma`` are not read.
     """
     for c in prange(params.shape[0]):
-        _one_cell(c, params, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
-                  gwirrigfrac, epot_br, outdays, nstep, mxiter, tol, values, nonconv)
+        _one_cell(c, params, rbuf, mbuf, zone, rain, epot, cropfac, gamma, irrigcode,
+                  gwirrigfrac, epot_br, vegclass, cropfac_table, gamma_table, use_tables,
+                  outdays, nstep, mxiter, tol, columns, all_columns, values, nonconv)
 
 
 @njit(**_JIT)
-def _simulate_cells_serial(params, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
-                           gwirrigfrac, epot_br, outdays, nstep, mxiter, tol,
-                           values, nonconv):
+def _simulate_cells_serial(params, rbuf, mbuf, zone, rain, epot, cropfac, gamma,
+                           irrigcode, gwirrigfrac, epot_br, vegclass, cropfac_table,
+                           gamma_table, use_tables, outdays, nstep, mxiter, tol, columns,
+                           all_columns, values, nonconv):
     """:func:`_simulate_cells` on the calling thread alone."""
     for c in range(params.shape[0]):
-        _one_cell(c, params, rbuf, mbuf, rain, epot, cropfac, gamma, irrigcode,
-                  gwirrigfrac, epot_br, outdays, nstep, mxiter, tol, values, nonconv)
+        _one_cell(c, params, rbuf, mbuf, zone, rain, epot, cropfac, gamma, irrigcode,
+                  gwirrigfrac, epot_br, vegclass, cropfac_table, gamma_table, use_tables,
+                  outdays, nstep, mxiter, tol, columns, all_columns, values, nonconv)
 
 
 # ---------------------------------------------------------------------------
@@ -626,8 +667,9 @@ def _run_loop(threads, parallel, serial, *args):
 
 
 def simulate_cells(
-    params: np.ndarray, *, rbuf=None, mbuf=None, nstep, mxiter, tol,
-    rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br=None, outdays,
+    params: np.ndarray, *, zone=None, rbuf=None, mbuf=None, nstep, mxiter, tol,
+    rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br=None,
+    vegclass=None, cropfac_table=None, gamma_table=None, outdays, columns=None,
     threads: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Run ``params.shape[0]`` independent cells in parallel.
@@ -635,10 +677,18 @@ def simulate_cells(
     ``params`` is an ``(ncell, NPARAM)`` array of rows from ``param_row``, and
     ``rbuf``/``mbuf`` are ``(ncell, width + 1)`` rows from ``buffer_rows``
     (empty buffers when omitted).  Each forcing variable is 1-D, or
-    ``(1, ntime)``, when every cell shares it, and ``(ncell, ntime)`` when
-    each has its own.  Returns ``values`` of shape ``(ncell, nrows, 26)`` and
-    the ``(ncell, 2)`` non-convergence counts.  ``engine.run_cells`` is the
-    entry point that also falls back to ``core``.
+    ``(1, ntime)``, when every cell shares it, and ``(nzone, ntime)``
+    otherwise, cell ``c`` reading row ``zone[c]``.  Without ``zone`` each cell
+    is its own zone, so ``(ncell, ntime)`` forcing is one row per cell.
+
+    With ``vegclass`` -- ``(1 | nzone, ntime)`` integer codes -- and the two
+    ``(ncell, nclass)`` tables, each cell's crop factor and gamma are looked up
+    by its zone's class each day, and ``cropfac``/``gamma`` are ignored.
+
+    ``columns`` are kernel column indices to keep, all 26 by default.  Returns
+    ``values`` of shape ``(ncell, nrows, len(columns))`` and the ``(ncell, 2)``
+    non-convergence counts.  ``engine.run_cells`` is the entry point that also
+    falls back to ``core``.
 
     ``threads`` caps the threads used: ``1`` runs the cells one after another
     on the calling thread and never starts Numba's thread pool, ``None`` uses
@@ -647,24 +697,46 @@ def simulate_cells(
     params = np.ascontiguousarray(params, dtype=np.float64)
     assert params.ndim == 2 and params.shape[1] == NPARAM, params.shape
     ncell = params.shape[0]
+    zone = (np.arange(ncell, dtype=np.int64) if zone is None
+            else np.ascontiguousarray(zone, dtype=np.int64))
+    assert zone.shape == (ncell,), (zone.shape, ncell)
     forcing = _forcing(rain, epot, cropfac, gamma, irrigcode, gwirrigfrac, epot_br, 2)
-    for a in forcing:
-        assert a.shape[0] in (1, ncell), (a.shape, ncell)
+    ntime = forcing[0].shape[1]
+    nzone = max(a.shape[0] for a in forcing)
+    use_tables = vegclass is not None
+    if use_tables:
+        vegclass = np.ascontiguousarray(np.reshape(vegclass, (-1, ntime)), dtype=np.int64)
+        cropfac_table = np.ascontiguousarray(cropfac_table, dtype=np.float64)
+        gamma_table = np.ascontiguousarray(gamma_table, dtype=np.float64)
+        assert cropfac_table.ndim == 2 and cropfac_table.shape[0] == ncell, \
+            cropfac_table.shape
+        assert gamma_table.shape == cropfac_table.shape, (gamma_table.shape,
+                                                          cropfac_table.shape)
+        nzone = max(nzone, vegclass.shape[0])
+    else:
+        vegclass = np.zeros((1, ntime), dtype=np.int64)
+        cropfac_table = gamma_table = np.zeros((1, 1))
+    for a in (*forcing, vegclass):
+        assert a.shape[0] in (1, nzone), (a.shape, nzone)
+    # A single-row variable is read as row 0 whatever the zone, so zone
+    # indices only have to fit when some variable has a row per zone.
+    assert ncell == 0 or nzone == 1 or (zone.min() >= 0 and zone.max() < nzone), \
+        "zone index out of range"
+    columns = (np.arange(NCOLUMN, dtype=np.int64) if columns is None
+               else np.ascontiguousarray(columns, dtype=np.int64))
+    all_columns = bool(np.array_equal(columns, np.arange(NCOLUMN)))
     outdays = np.ascontiguousarray(outdays, dtype=np.int64)
-    n = nrows(outdays, forcing[0].shape[1])
+    n = nrows(outdays, ntime)
     empty = np.zeros((ncell, 1))
     rbuf = empty if rbuf is None else np.ascontiguousarray(rbuf, dtype=np.float64)
     mbuf = empty if mbuf is None else np.ascontiguousarray(mbuf, dtype=np.float64)
     assert rbuf.shape[0] == ncell and mbuf.shape[0] == ncell, (rbuf.shape, mbuf.shape)
-    values = np.empty((ncell, n, NCOLUMN))
+    values = np.empty((ncell, n, columns.shape[0]))
     nonconv = np.zeros((ncell, 2), dtype=np.int64)
-    if ncell == 1:
-        # One cell gains nothing from a parallel region but its start-up cost,
-        # which a calibration loop of single runs would pay every time.
-        _simulate_cell(params[0], rbuf[0], mbuf[0], *(a[0] for a in forcing), outdays,
-                       int(nstep), int(mxiter), float(tol), values[0], nonconv[0])
-    else:
-        _run_loop(threads, _simulate_cells, _simulate_cells_serial,
-                  params, rbuf, mbuf, *forcing, outdays, int(nstep), int(mxiter),
-                  float(tol), values, nonconv)
+    # One cell gains nothing from a parallel region but its start-up cost,
+    # which a calibration loop of single runs would pay every time.
+    _run_loop(1 if ncell == 1 else threads, _simulate_cells, _simulate_cells_serial,
+              params, rbuf, mbuf, zone, *forcing, vegclass, cropfac_table, gamma_table,
+              use_tables, outdays, int(nstep), int(mxiter), float(tol), columns,
+              all_columns, values, nonconv)
     return values, nonconv
