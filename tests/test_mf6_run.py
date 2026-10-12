@@ -124,20 +124,29 @@ def _cell_areas(gwf, icpl):
     return np.array(areas)
 
 
-@pytest.mark.parametrize("method", ["fast", "flopy", "flopy-now"])
+@pytest.mark.parametrize("method", ["fast", "flopy", "flopy-now", "flopy-obs-file"])
 def test_modflow_budget_matches_rates(tmp_path, mf6_exe, method):
     sim, gwf = _build(tmp_path, mf6_exe)
     cells, rates = _rates(sim, gwf)
     names = [ZONES[c] for c in cells["icpl"]]
     obs_csv = "m.rch.obs.csv"
 
-    if method == "fast":
-        # The documented order: write the simulation, then the RCH file over it.
-        sim.write_simulation(silent=True)
+    def write_obs_file():
         with open(tmp_path / "m.rch.obs", "w") as fid:
             fid.write(f"BEGIN continuous FILEOUT {obs_csv}\n"
                       f"  rch_obs  rch  '{OBS_NAME}'\nEND continuous\n")
+
+    if method == "fast":
+        # The documented order: write the simulation, then the RCH file over it.
+        sim.write_simulation(silent=True)
+        write_obs_file()
         lmf6.recharge_package(gwf, cells, rates, boundnames=names, method="fast",
+                              obs_file="m.rch.obs")
+    elif method == "flopy-obs-file":
+        # A simulation on disk with its own OBS6 file, which flopy points at.
+        sim.write_simulation(silent=True)
+        write_obs_file()
+        lmf6.recharge_package(gwf, cells, rates, boundnames=names, method="flopy",
                               obs_file="m.rch.obs")
     elif method == "flopy":
         # The documented order: build the package object, then write it all.

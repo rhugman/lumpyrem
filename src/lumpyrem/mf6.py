@@ -489,7 +489,10 @@ def recharge_package(
         pname: the package name to create or replace.
         filename: the RCH file.  Defaults to the one the name file lists, or
             ``<model>.rch``.
-        obs_file: an RCH OBS6 file to reference from the options block.
+        obs_file: an existing RCH OBS6 file to reference from the options
+            block, with either method.  With ``method="flopy"`` the file is
+            referenced as it is; pass ``observations=`` instead to have flopy
+            write one.
         save_flows, print_input: RCH options.
         method: ``"flopy"`` (the default) replaces the model's RCH package
             object with a new ``ModflowGwfrch`` carrying the rates, so the
@@ -506,9 +509,8 @@ def recharge_package(
         write: with ``method="flopy"``, write the package file and the
             model's name file now.  Pass ``False`` when the simulation is
             written afterwards, which would only write them again.
-        **flopy_kwargs: passed to ``ModflowGwfrch`` with ``method="flopy"``
-            -- ``observations=`` among them, since flopy builds its own OBS6
-            package rather than referencing ``obs_file``.
+        **flopy_kwargs: passed to ``ModflowGwfrch`` with ``method="flopy"``,
+            ``observations=`` among them.
 
     Returns:
         The file path (``"fast"``) or the new flopy package (``"flopy"``).
@@ -545,9 +547,9 @@ def recharge_package(
     if boundnames is not None:
         _boundname_tokens(boundnames)
 
-    if obs_file:
-        raise MF6Error("obs_file is for method='fast'; with method='flopy' pass "
-                       "observations= as ModflowGwfrch takes it")
+    if obs_file and flopy_kwargs.get("observations") is not None:
+        raise MF6Error("pass obs_file (an existing OBS6 file) or observations= (one "
+                       "flopy writes), not both")
     import flopy
 
     if loaded is not None:
@@ -565,6 +567,14 @@ def recharge_package(
         save_flows=save_flows, print_input=print_input, maxbound=layer.size,
         stress_period_data=spd, **flopy_kwargs,
     )
+    if obs_file:
+        # ModflowGwfrch takes observations to write, not a file to point at;
+        # its OBS6 FILEIN record is set directly.
+        record = getattr(package, "_obs_filerecord", None)
+        if record is None:
+            raise MF6Error("this flopy version cannot reference an existing obs_file "
+                           "with method='flopy'; use method='fast' or observations=")
+        record.set_data([(obs_file,)])
     if write:
         # The package, the packages it owns (an OBS6 file from observations=),
         # and the name file that lists it: what MODFLOW needs to read it.
