@@ -398,6 +398,29 @@ def _register_package(gwf, ftype: str, filename: str, pname: str) -> None:
         fid.write("\n".join(lines) + "\n")
 
 
+def _drop_name_file_entries(gwf, ftype: str, filename: str, pname: str) -> None:
+    """Remove the flopy name file's entries for ``filename`` or ``pname``.
+
+    A model loaded with ``load_only`` keeps a name-file entry for every package
+    it skipped.  A new package registered under the same file then adds a
+    second entry beside the old one, and MODFLOW reads both -- so the old one
+    goes first.
+    """
+    entries = gwf.name_file.packages.get_data()
+    if entries is None:
+        return
+
+    def norm(f):
+        return os.path.normcase(os.path.normpath(str(f)))
+
+    keep = [tuple(e) for e in entries
+            if not (str(e[0]).upper() == ftype.upper()
+                    and (norm(e[1]) == norm(filename)
+                         or (len(e) > 2 and str(e[2]).lower() == pname.lower())))]
+    if len(keep) != len(entries):
+        gwf.name_file.packages.set_data(keep)
+
+
 def write_recharge_file(
     path,
     layer: np.ndarray,
@@ -554,6 +577,7 @@ def recharge_package(
 
     if loaded is not None:
         gwf.remove_package(loaded)
+    _drop_name_file_entries(gwf, "RCH6", filename, pname)
     cellid = [(int(a), int(b)) for a, b in zip(layer.tolist(), icpl.tolist(), strict=True)]
     names = None if boundnames is None else [str(b) for b in boundnames]
     spd = {}
