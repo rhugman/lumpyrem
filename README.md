@@ -186,10 +186,12 @@ else. It lives under `tests/` and is never imported by the package.
 
 ## Getting started
 
-Requires Python 3.10+ and `gfortran` (for the oracle only).
+Requires Python 3.10+, `gfortran` (for the oracle only) and MODFLOW 6 (for the
+`lumpyrem.mf6` tests only; `get-modflow` comes with flopy in the dev extras).
 
 ```bash
 pip install -e ".[dev,fast]"
+get-modflow :flopy --subset mf6
 pytest
 ```
 
