@@ -22,10 +22,14 @@ fast = ["numba>=0.60", "numpy<2.4"]
 plot = ["matplotlib>=3.7"]
 # lumpyrem.io: gridded forcing and results as xarray Datasets and netCDF.
 xarray = ["xarray>=2024.6", "netCDF4>=1.6"]
+# lumpyrem.mf6: RCH packages for MODFLOW 6 models.  Its tests also need the mf6
+# binary, which flopy's get-modflow installs.
+mf6 = ["flopy>=3.9"]
 # The example notebooks.
 examples = ["matplotlib>=3.7", "xarray>=2024.6", "netCDF4>=1.6", "jupyterlab"]
-test = ["pytest>=7", "matplotlib>=3.7", "xarray>=2024.6", "netCDF4>=1.6"]
-dev = ["pytest>=7", "ruff>=0.6", "matplotlib>=3.7", "xarray>=2024.6", "netCDF4>=1.6"]
+test = ["pytest>=7", "matplotlib>=3.7", "xarray>=2024.6", "netCDF4>=1.6", "flopy>=3.9"]
+dev = ["pytest>=7", "ruff>=0.6", "matplotlib>=3.7", "xarray>=2024.6", "netCDF4>=1.6",
+       "flopy>=3.9"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/lumpyrem"]
