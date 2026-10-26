@@ -398,6 +398,29 @@ def _register_package(gwf, ftype: str, filename: str, pname: str) -> None:
         fid.write("\n".join(lines) + "\n")
 
 
+def _drop_name_file_entries(gwf, ftype: str, filename: str, pname: str) -> None:
+    """Remove the flopy name file's entries for ``filename`` or ``pname``.
+
+    A model loaded with ``load_only`` keeps a name-file entry for every package
+    it skipped.  A new package registered under the same file then adds a
+    second entry beside the old one, and MODFLOW reads both -- so the old one
+    goes first.
+    """
+    entries = gwf.name_file.packages.get_data()
+    if entries is None:
+        return
+
+    def norm(f):
+        return os.path.normcase(os.path.normpath(str(f)))
+
+    keep = [tuple(e) for e in entries
+            if not (str(e[0]).upper() == ftype.upper()
+                    and (norm(e[1]) == norm(filename)
+                         or (len(e) > 2 and str(e[2]).lower() == pname.lower())))]
+    if len(keep) != len(entries):
+        gwf.name_file.packages.set_data(keep)
+
+
 def write_recharge_file(
     path,
     layer: np.ndarray,
@@ -489,7 +512,10 @@ def recharge_package(
         pname: the package name to create or replace.
         filename: the RCH file.  Defaults to the one the name file lists, or
             ``<model>.rch``.
-        obs_file: an RCH OBS6 file to reference from the options block.
+        obs_file: an existing RCH OBS6 file to reference from the options
+            block, with either method.  With ``method="flopy"`` the file is
+            referenced as it is; pass ``observations=`` instead to have flopy
+            write one.
         save_flows, print_input: RCH options.
         method: ``"flopy"`` (the default) replaces the model's RCH package
             object with a new ``ModflowGwfrch`` carrying the rates, so the
@@ -506,9 +532,8 @@ def recharge_package(
         write: with ``method="flopy"``, write the package file and the
             model's name file now.  Pass ``False`` when the simulation is
             written afterwards, which would only write them again.
-        **flopy_kwargs: passed to ``ModflowGwfrch`` with ``method="flopy"``
-            -- ``observations=`` among them, since flopy builds its own OBS6
-            package rather than referencing ``obs_file``.
+        **flopy_kwargs: passed to ``ModflowGwfrch`` with ``method="flopy"``,
+            ``observations=`` among them.
 
     Returns:
         The file path (``"fast"``) or the new flopy package (``"flopy"``).
@@ -545,13 +570,14 @@ def recharge_package(
     if boundnames is not None:
         _boundname_tokens(boundnames)
 
-    if obs_file:
-        raise MF6Error("obs_file is for method='fast'; with method='flopy' pass "
-                       "observations= as ModflowGwfrch takes it")
+    if obs_file and flopy_kwargs.get("observations") is not None:
+        raise MF6Error("pass obs_file (an existing OBS6 file) or observations= (one "
+                       "flopy writes), not both")
     import flopy
 
     if loaded is not None:
         gwf.remove_package(loaded)
+    _drop_name_file_entries(gwf, "RCH6", filename, pname)
     cellid = [(int(a), int(b)) for a, b in zip(layer.tolist(), icpl.tolist(), strict=True)]
     names = None if boundnames is None else [str(b) for b in boundnames]
     spd = {}
@@ -565,6 +591,14 @@ def recharge_package(
         save_flows=save_flows, print_input=print_input, maxbound=layer.size,
         stress_period_data=spd, **flopy_kwargs,
     )
+    if obs_file:
+        # ModflowGwfrch takes observations to write, not a file to point at;
+        # its OBS6 FILEIN record is set directly.
+        record = getattr(package, "_obs_filerecord", None)
+        if record is None:
+            raise MF6Error("this flopy version cannot reference an existing obs_file "
+                           "with method='flopy'; use method='fast' or observations=")
+        record.set_data([(obs_file,)])
     if write:
         # The package, the packages it owns (an OBS6 file from observations=),
         # and the name file that lists it: what MODFLOW needs to read it.

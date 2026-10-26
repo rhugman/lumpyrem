@@ -124,20 +124,44 @@ def _cell_areas(gwf, icpl):
     return np.array(areas)
 
 
-@pytest.mark.parametrize("method", ["fast", "flopy", "flopy-now"])
+@pytest.mark.parametrize("method", ["fast", "flopy", "flopy-now", "flopy-obs-file",
+                                    "fast-loaded", "flopy-loaded"])
 def test_modflow_budget_matches_rates(tmp_path, mf6_exe, method):
     sim, gwf = _build(tmp_path, mf6_exe)
     cells, rates = _rates(sim, gwf)
     names = [ZONES[c] for c in cells["icpl"]]
     obs_csv = "m.rch.obs.csv"
+    run = sim
 
-    if method == "fast":
-        # The documented order: write the simulation, then the RCH file over it.
-        sim.write_simulation(silent=True)
+    def write_obs_file():
         with open(tmp_path / "m.rch.obs", "w") as fid:
             fid.write(f"BEGIN continuous FILEOUT {obs_csv}\n"
                       f"  rch_obs  rch  '{OBS_NAME}'\nEND continuous\n")
+
+    if method.endswith("-loaded"):
+        # A model already set up with RCH, loaded with only the packages a
+        # recharge script needs -- the name file still lists the RCH file.
+        lmf6.recharge_package(gwf, cells, np.zeros_like(rates), write=False)
+        sim.write_simulation(silent=True)
+        write_obs_file()
+        run = flopy.mf6.MFSimulation.load(sim_ws=str(tmp_path), exe_name=mf6_exe,
+                                          load_only=["disv", "sto"], verbosity_level=0)
+        loaded = run.get_model("m")
+        lmf6.recharge_package(loaded, cells, rates, boundnames=names,
+                              method=method.split("-")[0], obs_file="m.rch.obs")
+        nam = (tmp_path / "m.nam").read_text().upper().split()
+        assert nam.count("RCH6") == 1, "the name file lists RCH more than once"
+    elif method == "fast":
+        # The documented order: write the simulation, then the RCH file over it.
+        sim.write_simulation(silent=True)
+        write_obs_file()
         lmf6.recharge_package(gwf, cells, rates, boundnames=names, method="fast",
+                              obs_file="m.rch.obs")
+    elif method == "flopy-obs-file":
+        # A simulation on disk with its own OBS6 file, which flopy points at.
+        sim.write_simulation(silent=True)
+        write_obs_file()
+        lmf6.recharge_package(gwf, cells, rates, boundnames=names, method="flopy",
                               obs_file="m.rch.obs")
     elif method == "flopy":
         # The documented order: build the package object, then write it all.
@@ -151,7 +175,7 @@ def test_modflow_budget_matches_rates(tmp_path, mf6_exe, method):
         lmf6.recharge_package(gwf, cells, rates, boundnames=names, method="flopy",
                               observations={obs_csv: [("rch_obs", "rch", OBS_NAME)]})
 
-    success, buff = sim.run_simulation(silent=True, report=True)
+    success, buff = run.run_simulation(silent=True, report=True)
     assert success, "MODFLOW 6 failed:\n" + "\n".join(buff[-20:])
 
     # Per cell and period: the flow RCH put into the model is rate x area.
